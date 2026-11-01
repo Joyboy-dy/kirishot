@@ -701,8 +701,8 @@ La v1 est trop grosse pour un seul plan d'implémentation. Elle est construite e
 | Jalon | Contenu | Résultat |
 |---|---|---|
 | **J0** | Spike de latence (§ 9). | La décision A ou B, avec les mesures. |
-| **J1** | Squelette Tauri, zone de notification, raccourcis, capture de tous les écrans, fenêtre de sélection (zone, fenêtre, plein écran), découpe, enregistrement, presse-papiers, réglages minimaux (dossier, format, action), CI. | Impr. écran → zone → enregistrée et copiée. |
-| **J2** | Vignette flottante (empilement, action automatique, glisser), historique sur le disque et fenêtre Historique, modèle de nom complet. | Le parcours façon macOS, sans éditeur. |
+| **J1** | Squelette Tauri, zone de notification, raccourcis, capture de tous les écrans, fenêtre de sélection (zone, fenêtre, plein écran), découpe, enregistrement, presse-papiers, réglages minimaux (dossier, format, action), modèle de nom complet, CI. | Impr. écran → zone → enregistrée et copiée. |
+| **J2** | Vignette flottante (empilement, action automatique, glisser), historique sur le disque et fenêtre Historique. | Le parcours façon macOS, sans éditeur. |
 | **J3** | Éditeur : modèle de document, annuler et rétablir, export, puis les outils Sélection, Recadrer, Flèche, Ligne, Rectangle, Ellipse, Crayon, Texte, Étapes. | Annoter puis copier ou enregistrer. |
 | **J4** | Outils Surligneur, Flouter, Projecteur, Loupe, Pipette, puis le panneau Embellir. | L'éditeur complet. |
 | **J5** | OCR, retardateur, épingles, Refaire la dernière zone. | Les extras de la v1. |

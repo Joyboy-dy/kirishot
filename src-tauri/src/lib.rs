@@ -6,6 +6,7 @@ mod geometry;
 mod logging;
 mod messages;
 mod notify;
+mod output;
 mod paths;
 mod settings;
 mod store;
