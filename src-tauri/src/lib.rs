@@ -12,6 +12,7 @@ mod output;
 mod paths;
 mod settings;
 mod store;
+mod tray;
 mod windowing;
 
 use tauri::Manager;
@@ -24,8 +25,10 @@ pub fn run() {
 
     tauri::Builder::default()
         // Must stay the first plugin so a second launch is caught before anything else starts.
-        .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {
-            log::info!("second instance launched");
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Err(e) = windowing::open_main(app) {
+                log::error!("cannot open the main window: {e}");
+            }
         }))
         .plugin(logging::plugin())
         .plugin(tauri_plugin_notification::init())
@@ -62,6 +65,9 @@ pub fn run() {
                 Err(e) => log::error!("cannot list monitors: {e}"),
             }
             hotkeys::register_all(app.handle(), &shortcuts);
+            if let Err(e) = tray::build(app.handle()) {
+                log::error!("{e}");
+            }
             log::info!(
                 "{} {} started",
                 messages::APP_NAME,

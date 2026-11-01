@@ -17,5 +17,7 @@
   "hint.enter.key": "Entrée",
   "hint.enter.action": "valider",
   "hint.escape.key": "Échap",
-  "hint.escape.action": "annuler"
+  "hint.escape.action": "annuler",
+  "main.settings": "Réglages",
+  "main.version": "Version {version}"
 }

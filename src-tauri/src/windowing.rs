@@ -170,6 +170,24 @@ pub fn reveal(window: &WebviewWindow, m: &MonitorInfo, focus: bool) -> KResult<(
     Ok(())
 }
 
+/// Shows the main window, creating it on demand: it does not exist until it is needed.
+pub fn open_main(app: &tauri::AppHandle) -> KResult<()> {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        window.show().map_err(window_error)?;
+        return window.set_focus().map_err(window_error);
+    }
+    WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+        .title("Kirishot")
+        .inner_size(1120.0, 720.0)
+        .min_inner_size(900.0, 600.0)
+        .center()
+        .background_color(BACKGROUND)
+        .build()
+        .map_err(window_error)?;
+    Ok(())
+}
+
 pub fn hide_overlays(app: &tauri::AppHandle) {
     let set = app.state::<OverlaySet>();
     set.0.lock().unwrap().pending.clear();

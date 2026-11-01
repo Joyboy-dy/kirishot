@@ -19,3 +19,8 @@ pub const COPIED_BODY: &str = "Collez-la où vous voulez avec Ctrl+V.";
 pub const FALLBACK_TITLE: &str = "Dossier de destination inaccessible";
 pub const FALLBACK_BODY: &str = "La capture a été enregistrée dans Images › Kirishot.";
 pub const FAILURE_TITLE: &str = "Capture impossible";
+
+pub const TRAY_REGION: &str = "Capturer une zone";
+pub const TRAY_FULLSCREEN: &str = "Capturer l'écran entier";
+pub const TRAY_SETTINGS: &str = "Réglages";
+pub const TRAY_QUIT: &str = "Quitter";
