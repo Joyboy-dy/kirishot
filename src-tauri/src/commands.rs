@@ -89,6 +89,7 @@ pub fn export_bindings(builder: &Builder<tauri::Wry>) {
 mod tests {
     use super::*;
 
+    // One test only: two tests writing the same bindings file in parallel would race.
     #[test]
     fn export_bindings_writes_typescript() {
         export_bindings(&specta_builder());
@@ -99,16 +100,6 @@ mod tests {
         .unwrap();
         assert!(ts.contains("appInfo"));
         assert!(ts.contains("KirishotError"));
-    }
-
-    #[test]
-    fn export_bindings_includes_capture_types() {
-        export_bindings(&specta_builder());
-        let ts = std::fs::read_to_string(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../src/lib/bindings.ts"
-        ))
-        .unwrap();
         for name in ["Rect", "Point", "MonitorInfo", "WindowInfo", "CommitTarget"] {
             assert!(
                 ts.contains(&format!("export type {name} =")),
