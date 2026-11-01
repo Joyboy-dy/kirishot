@@ -11,6 +11,7 @@ fn main() {
                 "app_info",
                 "settings_get",
                 "settings_update",
+                "open_save_folder",
                 "overlay_loaded",
                 "overlay_ready",
                 "overlay_claim",

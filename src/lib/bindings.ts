@@ -10,6 +10,8 @@ export const commands = {
 	appInfo: () => typedError<AppInfo, KirishotError>(__TAURI_INVOKE("app_info")),
 	settingsGet: () => typedError<SettingsView, KirishotError>(__TAURI_INVOKE("settings_get")),
 	settingsUpdate: (patch: SettingsPatch) => typedError<SettingsView, KirishotError>(__TAURI_INVOKE("settings_update", { patch })),
+	/**  Opens the destination folder in the Explorer, creating it first if needed. */
+	openSaveFolder: () => typedError<null, KirishotError>(__TAURI_INVOKE("open_save_folder")),
 	/**  The overlay page listens for frames: pending frames can be posted. */
 	overlayLoaded: () => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_loaded")),
 	/**  The overlay drew its frozen screen and can be shown. */

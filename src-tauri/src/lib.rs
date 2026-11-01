@@ -33,6 +33,8 @@ pub fn run() {
         .plugin(logging::plugin())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(store::CaptureStore::default())
         .manage(flow::FlowState::default())
         .manage(windowing::OverlaySet::default())

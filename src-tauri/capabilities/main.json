@@ -3,5 +3,12 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": ["main"],
-  "permissions": ["core:default", "allow-app-info", "allow-settings-get", "allow-settings-update"]
+  "permissions": [
+    "core:default",
+    "allow-app-info",
+    "allow-settings-get",
+    "allow-settings-update",
+    "allow-open-save-folder",
+    "dialog:allow-open"
+  ]
 }

@@ -19,5 +19,20 @@
   "hint.escape.key": "Échap",
   "hint.escape.action": "annuler",
   "main.settings": "Réglages",
-  "main.version": "Version {version}"
+  "main.version": "Version {version}",
+  "settings.saving": "Enregistrement",
+  "settings.folder": "Dossier de destination",
+  "settings.open": "Ouvrir",
+  "settings.change": "Changer…",
+  "settings.defaultFolder": "Revenir au dossier par défaut",
+  "settings.format": "Format",
+  "settings.format.png": "PNG garde le texte net, sans perte",
+  "settings.format.jpg": "JPG donne des fichiers plus légers, avec une légère perte",
+  "settings.format.webp": "WebP garde chaque pixel et pèse souvent moins que le PNG",
+  "settings.afterCapture": "Après une capture",
+  "settings.autoAction": "Action automatique",
+  "settings.autoAction.hint": "Appliquée juste après la capture.",
+  "settings.action.saveAndCopy": "Enregistrer et copier",
+  "settings.action.copy": "Copier seulement",
+  "settings.action.save": "Enregistrer seulement"
 }

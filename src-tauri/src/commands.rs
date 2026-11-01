@@ -108,6 +108,27 @@ pub async fn overlay_cancel(app: tauri::AppHandle) -> KResult<()> {
     Ok(())
 }
 
+/// Opens the destination folder in the Explorer, creating it first if needed.
+#[tauri::command]
+#[specta::specta]
+pub async fn open_save_folder(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, SettingsState>,
+) -> KResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let folder = settings::resolve_save_folder(&state.get(), &paths::default_save_folder(&app)?);
+    let fail = |e: &dyn std::fmt::Display| {
+        KirishotError::new(
+            ErrorCode::Save,
+            format!("Impossible d'ouvrir le dossier : {e}"),
+        )
+    };
+    std::fs::create_dir_all(&folder).map_err(|e| fail(&e))?;
+    app.opener()
+        .open_path(folder.to_string_lossy(), None::<&str>)
+        .map_err(|e| fail(&e))
+}
+
 /// Every command and event exposed to the front end.
 pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
@@ -117,6 +138,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             app_info,
             settings_get,
             settings_update,
+            open_save_folder,
             overlay_loaded,
             overlay_ready,
             overlay_claim,
