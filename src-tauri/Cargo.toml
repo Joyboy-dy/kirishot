@@ -32,6 +32,10 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-notification = "2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 chrono = "0.4"
+xcap = "0.9.8"
+ulid = "3"
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Dwm", "Win32_System_Threading"] }
 
 [dev-dependencies]
 tempfile = "3"

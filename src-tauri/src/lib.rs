@@ -1,12 +1,14 @@
 mod capture;
 mod commands;
 mod error;
+mod frame;
 mod geometry;
 mod logging;
 mod messages;
 mod notify;
 mod paths;
 mod settings;
+mod store;
 
 use tauri::Manager;
 
