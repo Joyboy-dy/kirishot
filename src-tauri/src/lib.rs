@@ -1,5 +1,7 @@
+mod capture;
 mod commands;
 mod error;
+mod geometry;
 mod logging;
 mod messages;
 mod notify;

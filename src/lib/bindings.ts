@@ -37,6 +37,9 @@ export type CaptureSettings = {
 	commitOnRelease: boolean,
 };
 
+/**  What the selection overlay asks Rust to capture. */
+export type CommitTarget = { kind: "region"; rect: Rect } | { kind: "window"; index: number } | { kind: "monitor" };
+
 /**  Stable error codes shared with the front end, which translates them. */
 export type ErrorCode = "capture" | "noActiveCapture" | "invalidSelection" | "encode" | "save" | "clipboard" | "settings" | "shortcut" | "window" | "internal";
 
@@ -65,8 +68,32 @@ export type KirishotError = {
 
 export type Language = "auto" | "fr" | "en";
 
+/**  A monitor and its position on the virtual desktop. */
+export type MonitorInfo = {
+	index: number,
+	name: string,
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+	scale: number | null,
+	primary: boolean,
+};
+
+export type Point = {
+	x: number,
+	y: number,
+};
+
 export type PrintScreenSettings = {
 	releasedByKirishot: boolean,
+};
+
+export type Rect = {
+	x: number,
+	y: number,
+	width: number,
+	height: number,
 };
 
 export type SaveSettings = SaveSettings_Serialize | SaveSettings_Deserialize;
@@ -188,6 +215,14 @@ export type SystemSettings = {
 };
 
 export type Theme = "system" | "dark" | "light";
+
+/**  A visible top-level window. Lists of windows are ordered topmost first. */
+export type WindowInfo = {
+	index: number,
+	title: string,
+	appName: string,
+	bounds: Rect,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

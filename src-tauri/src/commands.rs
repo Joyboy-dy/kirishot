@@ -3,7 +3,9 @@ use specta_typescript::Typescript;
 use tauri::Manager;
 use tauri_specta::{Builder, Event, collect_commands, collect_events};
 
+use crate::capture::types::{CommitTarget, MonitorInfo, WindowInfo};
 use crate::error::{ErrorCode, KResult, KirishotError};
+use crate::geometry::{Point, Rect};
 use crate::paths;
 use crate::settings::model::{SettingsPatch, apply_patch};
 use crate::settings::{self, SettingsChanged, SettingsState, SettingsView};
@@ -62,6 +64,12 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![app_info, settings_get, settings_update])
         .events(collect_events![SettingsChanged])
+        // Used by the overlay before any command carries them.
+        .typ::<Rect>()
+        .typ::<Point>()
+        .typ::<MonitorInfo>()
+        .typ::<WindowInfo>()
+        .typ::<CommitTarget>()
 }
 
 /// Writes `src/lib/bindings.ts`, which the front end imports through `src/lib/ipc.ts`.
@@ -91,5 +99,21 @@ mod tests {
         .unwrap();
         assert!(ts.contains("appInfo"));
         assert!(ts.contains("KirishotError"));
+    }
+
+    #[test]
+    fn export_bindings_includes_capture_types() {
+        export_bindings(&specta_builder());
+        let ts = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../src/lib/bindings.ts"
+        ))
+        .unwrap();
+        for name in ["Rect", "Point", "MonitorInfo", "WindowInfo", "CommitTarget"] {
+            assert!(
+                ts.contains(&format!("export type {name} =")),
+                "{name} missing"
+            );
+        }
     }
 }
