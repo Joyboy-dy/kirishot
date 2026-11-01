@@ -130,7 +130,14 @@ describe('selection', () => {
 
   it('window mode never drags', () => {
     const r = run([down(10, 10), move(400, 400)], { ...ctx, mode: 'window' });
-    expect(r.state.kind).toBe('idle');
+    expect(r.state.kind).not.toBe('dragging');
+  });
+
+  it('window mode ignores a release whose press was not on the overlay', () => {
+    // A toolbar button stops pointerdown, so its pointerup arrives alone.
+    const r = run([move(1000, 200), up(1000, 200)], { ...ctx, mode: 'window' });
+    expect(r.outcomes.at(-1)).toEqual({ type: 'none' });
+    expect(r.state).toEqual({ kind: 'idle', hover: W });
   });
 
   it('window mode click commits the hovered window', () => {

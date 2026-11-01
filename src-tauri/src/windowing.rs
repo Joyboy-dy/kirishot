@@ -15,12 +15,15 @@ use crate::frame;
 pub const OVERLAY_PREFIX: &str = "overlay-";
 const BACKGROUND: Color = Color(14, 16, 20, 255);
 
-pub fn overlay_label(i: usize) -> String {
-    format!("{OVERLAY_PREFIX}{i}")
+/// `overlay-<generation>-<monitor>`: a recreated set gets new labels, because `destroy()` is
+/// asynchronous and the old ones stay registered until the event loop drops them.
+pub fn overlay_label(generation: u32, i: usize) -> String {
+    format!("{OVERLAY_PREFIX}{generation}-{i}")
 }
 
 pub fn monitor_index(label: &str) -> Option<usize> {
-    label.strip_prefix(OVERLAY_PREFIX)?.parse().ok()
+    let rest = label.strip_prefix(OVERLAY_PREFIX)?;
+    rest.rsplit_once('-')?.1.parse().ok()
 }
 
 /// What makes an overlay window fit its monitor.
@@ -52,6 +55,7 @@ pub fn needs_recreate(current: &[MonitorSig], wanted: &[MonitorSig], all_alive: 
 
 #[derive(Default)]
 struct Overlays {
+    generation: u32,
     signature: Vec<MonitorSig>,
     /// Pages that told Rust they can receive a frame.
     loaded: HashSet<String>,
@@ -67,8 +71,11 @@ pub fn ensure_overlays(app: &tauri::AppHandle, monitors: &[MonitorInfo]) -> KRes
     let set = app.state::<OverlaySet>();
     let mut overlays = set.0.lock().unwrap();
     let wanted = signature(monitors);
-    let all_alive =
-        (0..monitors.len()).all(|i| app.get_webview_window(&overlay_label(i)).is_some());
+    let generation = overlays.generation;
+    let all_alive = (0..monitors.len()).all(|i| {
+        app.get_webview_window(&overlay_label(generation, i))
+            .is_some()
+    });
     if !needs_recreate(&overlays.signature, &wanted, all_alive) {
         return Ok(());
     }
@@ -78,9 +85,12 @@ pub fn ensure_overlays(app: &tauri::AppHandle, monitors: &[MonitorInfo]) -> KRes
             let _ = window.destroy();
         }
     }
-    *overlays = Overlays::default();
+    *overlays = Overlays {
+        generation: generation + 1,
+        ..Overlays::default()
+    };
     for (i, monitor) in monitors.iter().enumerate() {
-        create_overlay(app, i, monitor)?;
+        create_overlay(app, overlays.generation, i, monitor)?;
     }
     overlays.signature = wanted;
     Ok(())
@@ -93,10 +103,15 @@ fn window_error(e: tauri::Error) -> KirishotError {
     )
 }
 
-fn create_overlay(app: &tauri::AppHandle, i: usize, m: &MonitorInfo) -> KResult<WebviewWindow> {
+fn create_overlay(
+    app: &tauri::AppHandle,
+    generation: u32,
+    i: usize,
+    m: &MonitorInfo,
+) -> KResult<WebviewWindow> {
     let window = WebviewWindowBuilder::new(
         app,
-        overlay_label(i),
+        overlay_label(generation, i),
         WebviewUrl::App("overlay.html".into()),
     )
     .title("Kirishot")
@@ -110,6 +125,14 @@ fn create_overlay(app: &tauri::AppHandle, i: usize, m: &MonitorInfo) -> KResult<
     .background_color(BACKGROUND)
     .build()
     .map_err(window_error)?;
+    // Alt+F4 on a focused overlay cancels the capture instead of destroying the window.
+    let handle = app.clone();
+    window.on_window_event(move |event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            crate::flow::cancel(&handle);
+        }
+    });
     place(&window, m)?;
     Ok(window)
 }
@@ -131,12 +154,12 @@ pub fn post_to_overlay(
     frame: Vec<u8>,
     session_json: String,
 ) -> KResult<()> {
-    let label = overlay_label(i);
+    let set = app.state::<OverlaySet>();
+    let mut overlays = set.0.lock().unwrap();
+    let label = overlay_label(overlays.generation, i);
     let window = app
         .get_webview_window(&label)
         .ok_or_else(|| KirishotError::new(ErrorCode::Window, "Fenêtre de sélection introuvable"))?;
-    let set = app.state::<OverlaySet>();
-    let mut overlays = set.0.lock().unwrap();
     if overlays.loaded.contains(&label) {
         drop(overlays);
         frame::post_frame(&window, frame, session_json)
@@ -206,8 +229,15 @@ mod tests {
 
     #[test]
     fn labels_roundtrip() {
-        assert_eq!(monitor_index(&overlay_label(2)), Some(2));
+        assert_eq!(monitor_index(&overlay_label(0, 2)), Some(2));
+        assert_eq!(monitor_index(&overlay_label(7, 1)), Some(1));
         assert_eq!(monitor_index("main"), None);
+    }
+
+    #[test]
+    fn a_new_generation_never_reuses_a_label() {
+        // destroy() is asynchronous: the old label stays registered for a while.
+        assert_ne!(overlay_label(0, 0), overlay_label(1, 0));
     }
 
     #[test]

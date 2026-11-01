@@ -17,6 +17,7 @@ export type Mode = 'region' | 'window';
 
 export type SelState =
   | { kind: 'idle'; hover: WindowInfo | null }
+  | { kind: 'pressed'; hover: WindowInfo | null }
   | { kind: 'dragging'; anchor: Point; rect: Rect; hover: WindowInfo | null }
   | { kind: 'adjusting'; rect: Rect }
   | { kind: 'moving'; rect: Rect; grab: Point; origin: Rect }
@@ -70,9 +71,17 @@ export function step(s: SelState, e: SelEvent, ctx: Ctx): Result {
       if (e.type === 'pointerMove')
         return stay({ kind: 'idle', hover: windowAt(ctx.windows, e.at) });
       if (e.type === 'pointerDown' && ctx.mode === 'region') return startDrag(e.at, s.hover);
-      if (e.type === 'pointerUp' && ctx.mode === 'window') {
+      // Window mode commits on a full click on the overlay: a release alone (a toolbar
+      // button stops its pointerdown) must not capture the window behind the toolbar.
+      if (e.type === 'pointerDown') return stay({ kind: 'pressed', hover: s.hover });
+      return stay(s);
+
+    case 'pressed':
+      if (e.type === 'pointerMove')
+        return stay({ kind: 'pressed', hover: windowAt(ctx.windows, e.at) });
+      if (e.type === 'pointerUp') {
         const hover = windowAt(ctx.windows, e.at) ?? s.hover;
-        return hover ? commit({ kind: 'window', index: hover.index }) : stay(s);
+        return hover ? commit({ kind: 'window', index: hover.index }) : stay(initialState);
       }
       return stay(s);
 

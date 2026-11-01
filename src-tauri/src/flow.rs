@@ -41,6 +41,9 @@ pub struct OverlayClaimed {
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 pub struct OverlayReset {}
 
+/// An overlay not revealed by then will never be: the capture is abandoned.
+pub const REVEAL_TIMEOUT: Duration = Duration::from_secs(3);
+
 struct Active {
     capture_id: Option<String>,
     started: Instant,
@@ -86,6 +89,18 @@ impl FlowState {
         }
         active.revealed = true;
         Some(active.started.elapsed())
+    }
+
+    /// Ends capture `id` if no overlay was ever revealed for it: a frame was lost on the way.
+    pub fn expire_unrevealed(&self, id: &str) -> bool {
+        let mut active = self.active.lock().unwrap();
+        let stuck = active
+            .as_ref()
+            .is_some_and(|a| !a.revealed && a.capture_id.as_deref() == Some(id));
+        if stuck {
+            *active = None;
+        }
+        stuck
     }
 
     pub fn finish(&self) {
@@ -155,11 +170,33 @@ fn start_region(app: &tauri::AppHandle) -> KResult<()> {
         .collect();
     // The capture must be active before any overlay can answer.
     let id = app.state::<CaptureStore>().insert(session);
-    app.state::<FlowState>().attach(id);
+    app.state::<FlowState>().attach(id.clone());
     for (i, frame, json) in posts {
         windowing::post_to_overlay(app, i, frame, json)?;
     }
+    watch_reveal(app, id);
     Ok(())
+}
+
+/// A frame can be lost after it is posted (shared buffer, page error, renderer crash): without
+/// this, the capture would stay active and every later shortcut would be ignored.
+fn watch_reveal(app: &tauri::AppHandle, id: String) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(REVEAL_TIMEOUT);
+        if app.state::<FlowState>().expire_unrevealed(&id) {
+            log::error!("capture {id} never revealed, abandoned");
+            app.state::<CaptureStore>().remove(&id);
+            windowing::hide_overlays(&app);
+            if let Err(e) = (OverlayReset {}).emit(&app) {
+                log::warn!("cannot emit overlay-reset: {e}");
+            }
+            notify::failure(
+                &app,
+                &KirishotError::new(ErrorCode::Window, "L'écran figé n'a pas pu s'afficher"),
+            );
+        }
+    });
 }
 
 fn run_fullscreen(app: &tauri::AppHandle) -> KResult<()> {
@@ -288,6 +325,35 @@ mod tests {
         assert!(!f.try_begin(Instant::now()));
         f.finish();
         assert!(f.try_begin(Instant::now()));
+    }
+
+    #[test]
+    fn an_unrevealed_capture_expires() {
+        let f = FlowState::default();
+        f.try_begin(Instant::now());
+        f.attach("a".into());
+        assert!(f.expire_unrevealed("a"));
+        assert_eq!(f.active_capture(), None);
+        assert!(f.try_begin(Instant::now()));
+    }
+
+    #[test]
+    fn a_revealed_capture_does_not_expire() {
+        let f = FlowState::default();
+        f.try_begin(Instant::now());
+        f.attach("a".into());
+        f.mark_revealed();
+        assert!(!f.expire_unrevealed("a"));
+        assert_eq!(f.active_capture().as_deref(), Some("a"));
+    }
+
+    #[test]
+    fn expiring_another_capture_leaves_the_active_one() {
+        let f = FlowState::default();
+        f.try_begin(Instant::now());
+        f.attach("b".into());
+        assert!(!f.expire_unrevealed("a"));
+        assert_eq!(f.active_capture().as_deref(), Some("b"));
     }
 
     #[test]

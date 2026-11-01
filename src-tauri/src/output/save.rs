@@ -38,18 +38,40 @@ pub fn save_bytes(
     }
 }
 
-/// Writes a hidden temporary file, then renames it, so a failed write never leaves a broken image.
+/// Reserves the final name, writes a hidden temporary file, then renames it over the
+/// reservation, so a failed write never leaves a broken image. Reserving with `create_new` keeps
+/// two captures saved at the same second from picking the same name.
 fn write_into(bytes: &[u8], dir: &Path, stem: &str, ext: &str) -> std::io::Result<PathBuf> {
     std::fs::create_dir_all(dir)?;
-    let path = unique_path(dir, stem, ext, Path::exists);
+    let path = reserve(dir, stem, ext)?;
     let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-    let tmp = dir.join(format!(".{file_name}.kirishot-tmp"));
+    let tmp = dir.join(format!(
+        ".{file_name}.{}.kirishot-tmp",
+        ulid::Ulid::generate()
+    ));
     let written = std::fs::write(&tmp, bytes).and_then(|_| std::fs::rename(&tmp, &path));
     if let Err(e) = written {
         let _ = std::fs::remove_file(&tmp);
+        let _ = std::fs::remove_file(&path);
         return Err(e);
     }
     Ok(path)
+}
+
+fn reserve(dir: &Path, stem: &str, ext: &str) -> std::io::Result<PathBuf> {
+    loop {
+        let path = unique_path(dir, stem, ext, Path::exists);
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(_) => return Ok(path),
+            // Taken between the check and the creation: the next call picks the next suffix.
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -94,5 +116,36 @@ mod tests {
             .filter(|e| e.file_name().to_string_lossy().ends_with(".kirishot-tmp"))
             .collect();
         assert!(leftovers.is_empty());
+    }
+
+    #[test]
+    fn concurrent_saves_with_the_same_name_keep_every_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let pref = dir.path().join("pref");
+        let fb = dir.path().join("fallback");
+        let barrier = std::sync::Barrier::new(8);
+        let saved: Vec<SavedFile> = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..8u8)
+                .map(|i| {
+                    let (pref, fb, barrier) = (&pref, &fb, &barrier);
+                    scope.spawn(move || {
+                        barrier.wait();
+                        save_bytes(&vec![i; 200_000], pref, fb, "Shot", "png").unwrap()
+                    })
+                })
+                .collect();
+            handles.into_iter().map(|h| h.join().unwrap()).collect()
+        });
+        assert!(saved.iter().all(|s| !s.used_fallback));
+        let mut paths: Vec<_> = saved.iter().map(|s| s.path.clone()).collect();
+        paths.sort();
+        paths.dedup();
+        assert_eq!(paths.len(), 8, "two captures were written to the same file");
+        let mut firsts: Vec<u8> = saved
+            .iter()
+            .map(|s| std::fs::read(&s.path).unwrap()[0])
+            .collect();
+        firsts.sort();
+        assert_eq!(firsts, (0..8u8).collect::<Vec<_>>());
     }
 }

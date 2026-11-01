@@ -134,7 +134,8 @@ export function Overlay() {
   // While dragging, a selection smaller than 4×4 px still shows the hovered window.
   const selRect =
     currentRect && !(sel.kind === 'dragging' && isTooSmall(currentRect)) ? currentRect : null;
-  const hover = sel.kind === 'idle' || sel.kind === 'dragging' ? sel.hover : null;
+  const hover =
+    sel.kind === 'idle' || sel.kind === 'pressed' || sel.kind === 'dragging' ? sel.hover : null;
   const showMagnifier =
     active &&
     pointer !== null &&
