@@ -27,6 +27,7 @@ impl CaptureStore {
         self.sessions.lock().unwrap().remove(id);
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.sessions.lock().unwrap().len()
     }

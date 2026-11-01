@@ -11,6 +11,11 @@ fn main() {
                 "app_info",
                 "settings_get",
                 "settings_update",
+                "overlay_loaded",
+                "overlay_ready",
+                "overlay_claim",
+                "overlay_commit",
+                "overlay_cancel",
             ])),
     )
     .expect("failed to run tauri-build");

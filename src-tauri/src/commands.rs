@@ -5,10 +5,12 @@ use tauri_specta::{Builder, Event, collect_commands, collect_events};
 
 use crate::capture::types::{CommitTarget, MonitorInfo, WindowInfo};
 use crate::error::{ErrorCode, KResult, KirishotError};
+use crate::flow::{self, OverlayClaimed, OverlayReset, OverlaySession};
 use crate::geometry::{Point, Rect};
 use crate::paths;
 use crate::settings::model::{SettingsPatch, apply_patch};
 use crate::settings::{self, SettingsChanged, SettingsState, SettingsView};
+use crate::windowing;
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
@@ -59,17 +61,79 @@ pub async fn settings_update(
     Ok(view)
 }
 
+fn overlay_monitor(window: &tauri::WebviewWindow) -> KResult<usize> {
+    windowing::monitor_index(window.label())
+        .ok_or_else(|| KirishotError::new(ErrorCode::Window, "Fenêtre de sélection inconnue"))
+}
+
+/// The overlay page listens for frames: pending frames can be posted.
+#[tauri::command]
+#[specta::specta]
+pub async fn overlay_loaded(window: tauri::WebviewWindow) -> KResult<()> {
+    windowing::mark_loaded(&window)
+}
+
+/// The overlay drew its frozen screen and can be shown.
+#[tauri::command]
+#[specta::specta]
+pub async fn overlay_ready(window: tauri::WebviewWindow) -> KResult<()> {
+    flow::reveal(&window)
+}
+
+/// A selection started on this monitor: the other overlays drop theirs.
+#[tauri::command]
+#[specta::specta]
+pub async fn overlay_claim(app: tauri::AppHandle, window: tauri::WebviewWindow) -> KResult<()> {
+    let monitor_index = overlay_monitor(&window)? as u32;
+    OverlayClaimed { monitor_index }
+        .emit(&app)
+        .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn overlay_commit(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    capture_id: String,
+    target: CommitTarget,
+) -> KResult<()> {
+    flow::commit(&app, overlay_monitor(&window)?, &capture_id, target)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn overlay_cancel(app: tauri::AppHandle) -> KResult<()> {
+    flow::cancel(&app);
+    Ok(())
+}
+
 /// Every command and event exposed to the front end.
 pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
-        .commands(collect_commands![app_info, settings_get, settings_update])
-        .events(collect_events![SettingsChanged])
+        .commands(collect_commands![
+            app_info,
+            settings_get,
+            settings_update,
+            overlay_loaded,
+            overlay_ready,
+            overlay_claim,
+            overlay_commit,
+            overlay_cancel
+        ])
+        .events(collect_events![
+            SettingsChanged,
+            OverlayClaimed,
+            OverlayReset
+        ])
         // Used by the overlay before any command carries them.
         .typ::<Rect>()
         .typ::<Point>()
         .typ::<MonitorInfo>()
         .typ::<WindowInfo>()
         .typ::<CommitTarget>()
+        // Sent as the shared buffer's additionalData, never as a command result.
+        .typ::<OverlaySession>()
 }
 
 /// Writes `src/lib/bindings.ts`, which the front end imports through `src/lib/ipc.ts`.

@@ -10,10 +10,20 @@ export const commands = {
 	appInfo: () => typedError<AppInfo, KirishotError>(__TAURI_INVOKE("app_info")),
 	settingsGet: () => typedError<SettingsView_Serialize, KirishotError>(__TAURI_INVOKE("settings_get")),
 	settingsUpdate: (patch: SettingsPatch_Deserialize) => typedError<SettingsView_Serialize, KirishotError>(__TAURI_INVOKE("settings_update", { patch })),
+	/**  The overlay page listens for frames: pending frames can be posted. */
+	overlayLoaded: () => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_loaded")),
+	/**  The overlay drew its frozen screen and can be shown. */
+	overlayReady: () => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_ready")),
+	/**  A selection started on this monitor: the other overlays drop theirs. */
+	overlayClaim: () => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_claim")),
+	overlayCommit: (captureId: string, target: CommitTarget) => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_commit", { captureId, target })),
+	overlayCancel: () => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_cancel")),
 };
 
 /** Events */
 export const events = {
+	overlayClaimed: makeEvent<OverlayClaimed, OverlayClaimed>("overlay-claimed"),
+	overlayReset: makeEvent<OverlayReset, OverlayReset>("overlay-reset"),
 	settingsChanged: makeEvent<SettingsChanged_Serialize, SettingsChanged_Deserialize>("settings-changed"),
 };
 
@@ -78,6 +88,39 @@ export type MonitorInfo = {
 	height: number,
 	scale: number | null,
 	primary: boolean,
+};
+
+/**  Tells the other overlays to drop their selection: a selection stays on one monitor. */
+export type OverlayClaimed = {
+	monitorIndex: number,
+};
+
+/**  The capture ended: overlays clear their canvas and selection. */
+export type OverlayReset = Record<string, never>;
+
+/**  What an overlay needs besides its pixels; sent with the frame as `additionalData`. */
+export type OverlaySession = OverlaySession_Serialize | OverlaySession_Deserialize;
+
+/**  What an overlay needs besides its pixels; sent with the frame as `additionalData`. */
+export type OverlaySession_Deserialize = {
+	captureId: string,
+	monitor: MonitorInfo,
+	/**  In the monitor's coordinates, topmost first. */
+	windows: WindowInfo[],
+	/**  In the monitor's coordinates; `None` when the cursor is on another monitor. */
+	cursor?: Point | null,
+	commitOnRelease: boolean,
+};
+
+/**  What an overlay needs besides its pixels; sent with the frame as `additionalData`. */
+export type OverlaySession_Serialize = {
+	captureId: string,
+	monitor: MonitorInfo,
+	/**  In the monitor's coordinates, topmost first. */
+	windows: WindowInfo[],
+	/**  In the monitor's coordinates; `None` when the cursor is on another monitor. */
+	cursor: Point | null,
+	commitOnRelease: boolean,
 };
 
 export type Point = {
