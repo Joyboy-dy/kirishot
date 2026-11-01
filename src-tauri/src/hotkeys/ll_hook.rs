@@ -86,7 +86,8 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
                 };
                 // Clone the callback out of the lock: it must stay short, Windows drops slow hooks.
                 let on_press = ON_PRESS.lock().unwrap().clone();
-                SWALLOWED.store(on_press.is_some_and(|f| f(mods)), Ordering::SeqCst);
+                let handled = on_press.is_some_and(|f| f(mods));
+                SWALLOWED.store(handled, Ordering::SeqCst);
             }
             if SWALLOWED.load(Ordering::SeqCst) {
                 return LRESULT(1);

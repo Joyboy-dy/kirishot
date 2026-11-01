@@ -46,7 +46,10 @@ pub fn register_all(app: &tauri::AppHandle, s: &Shortcuts) {
     let mut printscreen = Vec::new();
     for (action, accel) in bindings(s) {
         match ll_hook::printscreen_mods(&accel) {
-            Some(mods) => printscreen.push((mods, action)),
+            Some(mods) => {
+                log::debug!("{accel}: low-level hook");
+                printscreen.push((mods, action));
+            }
             None => register_with_plugin(app, action, &accel),
         }
     }
@@ -64,6 +67,7 @@ pub fn register_all(app: &tauri::AppHandle, s: &Shortcuts) {
     });
     match installed {
         Ok(guard) => {
+            log::info!("PrintScreen hook installed");
             app.manage(HookState(guard));
         }
         Err(e) => {

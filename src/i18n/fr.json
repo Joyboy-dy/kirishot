@@ -1,0 +1,21 @@
+{
+  "overlay.zone": "Zone",
+  "overlay.window": "Fenêtre",
+  "overlay.fullscreen": "Plein écran",
+  "overlay.cancel": "Annuler",
+  "overlay.windowLabel": "{title} · {w} × {h}",
+  "overlay.size": "{w} × {h}",
+  "overlay.pixel": "{x}, {y} · {hex}",
+  "hint.drag.key": "Glisser",
+  "hint.drag.action": "zone",
+  "hint.click.key": "Clic",
+  "hint.click.action": "fenêtre survolée",
+  "hint.shift.key": "Maj",
+  "hint.shift.action": "carré",
+  "hint.arrows.key": "← ↑ ↓ →",
+  "hint.arrows.action": "ajuster au pixel",
+  "hint.enter.key": "Entrée",
+  "hint.enter.action": "valider",
+  "hint.escape.key": "Échap",
+  "hint.escape.action": "annuler"
+}

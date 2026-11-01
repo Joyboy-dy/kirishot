@@ -8,8 +8,8 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 /** Commands */
 export const commands = {
 	appInfo: () => typedError<AppInfo, KirishotError>(__TAURI_INVOKE("app_info")),
-	settingsGet: () => typedError<SettingsView_Serialize, KirishotError>(__TAURI_INVOKE("settings_get")),
-	settingsUpdate: (patch: SettingsPatch_Deserialize) => typedError<SettingsView_Serialize, KirishotError>(__TAURI_INVOKE("settings_update", { patch })),
+	settingsGet: () => typedError<SettingsView, KirishotError>(__TAURI_INVOKE("settings_get")),
+	settingsUpdate: (patch: SettingsPatch) => typedError<SettingsView, KirishotError>(__TAURI_INVOKE("settings_update", { patch })),
 	/**  The overlay page listens for frames: pending frames can be posted. */
 	overlayLoaded: () => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_loaded")),
 	/**  The overlay drew its frozen screen and can be shown. */
@@ -24,7 +24,7 @@ export const commands = {
 export const events = {
 	overlayClaimed: makeEvent<OverlayClaimed, OverlayClaimed>("overlay-claimed"),
 	overlayReset: makeEvent<OverlayReset, OverlayReset>("overlay-reset"),
-	settingsChanged: makeEvent<SettingsChanged_Serialize, SettingsChanged_Deserialize>("settings-changed"),
+	settingsChanged: makeEvent<SettingsChanged, SettingsChanged>("settings-changed"),
 };
 
 /* Types */
@@ -56,14 +56,7 @@ export type ErrorCode = "capture" | "noActiveCapture" | "invalidSelection" | "en
 /**  Destination folder chosen in the settings page. */
 export type FolderChoice = { kind: "default" } | { kind: "custom"; path: string };
 
-export type HistorySettings = HistorySettings_Serialize | HistorySettings_Deserialize;
-
-export type HistorySettings_Deserialize = {
-	/**  `None` keeps captures forever. */
-	retentionDays?: number | null,
-};
-
-export type HistorySettings_Serialize = {
+export type HistorySettings = {
 	/**  `None` keeps captures forever. */
 	retentionDays: number | null,
 };
@@ -99,21 +92,7 @@ export type OverlayClaimed = {
 export type OverlayReset = Record<string, never>;
 
 /**  What an overlay needs besides its pixels; sent with the frame as `additionalData`. */
-export type OverlaySession = OverlaySession_Serialize | OverlaySession_Deserialize;
-
-/**  What an overlay needs besides its pixels; sent with the frame as `additionalData`. */
-export type OverlaySession_Deserialize = {
-	captureId: string,
-	monitor: MonitorInfo,
-	/**  In the monitor's coordinates, topmost first. */
-	windows: WindowInfo[],
-	/**  In the monitor's coordinates; `None` when the cursor is on another monitor. */
-	cursor?: Point | null,
-	commitOnRelease: boolean,
-};
-
-/**  What an overlay needs besides its pixels; sent with the frame as `additionalData`. */
-export type OverlaySession_Serialize = {
+export type OverlaySession = {
 	captureId: string,
 	monitor: MonitorInfo,
 	/**  In the monitor's coordinates, topmost first. */
@@ -139,17 +118,7 @@ export type Rect = {
 	height: number,
 };
 
-export type SaveSettings = SaveSettings_Serialize | SaveSettings_Deserialize;
-
-export type SaveSettings_Deserialize = {
-	/**  `None` keeps the default folder (Pictures\Kirishot), resolved at each use. */
-	folder?: string | null,
-	format: ImageFormat,
-	nameTemplate: string,
-	counter: number,
-};
-
-export type SaveSettings_Serialize = {
+export type SaveSettings = {
 	/**  `None` keeps the default folder (Pictures\Kirishot), resolved at each use. */
 	folder: string | null,
 	format: ImageFormat,
@@ -157,92 +126,38 @@ export type SaveSettings_Serialize = {
 	counter: number,
 };
 
-export type Settings = Settings_Serialize | Settings_Deserialize;
-
-export type SettingsChanged = SettingsChanged_Serialize | SettingsChanged_Deserialize;
-
-export type SettingsChanged_Deserialize = SettingsView_Deserialize;
-
-export type SettingsChanged_Serialize = SettingsView_Serialize;
-
-/**
- *  The fields the front end may change. Rust-owned fields such as `save.counter` are not here,
- *  so a stale copy in the page can never overwrite them.
- */
-export type SettingsPatch = SettingsPatch_Serialize | SettingsPatch_Deserialize;
-
-/**
- *  The fields the front end may change. Rust-owned fields such as `save.counter` are not here,
- *  so a stale copy in the page can never overwrite them.
- */
-export type SettingsPatch_Deserialize = {
-	saveFolder?: FolderChoice | null,
-	saveFormat?: ImageFormat | null,
-	autoAction?: AutoAction | null,
+export type Settings = {
+	version: number,
+	save: SaveSettings,
+	afterCapture: AfterCaptureSettings,
+	capture: CaptureSettings,
+	shortcuts: Shortcuts,
+	history: HistorySettings,
+	system: SystemSettings,
+	printScreen: PrintScreenSettings,
+	onboardingDone: boolean,
 };
 
+export type SettingsChanged = SettingsView;
+
 /**
  *  The fields the front end may change. Rust-owned fields such as `save.counter` are not here,
  *  so a stale copy in the page can never overwrite them.
  */
-export type SettingsPatch_Serialize = {
+export type SettingsPatch = {
 	saveFolder: FolderChoice | null,
 	saveFormat: ImageFormat | null,
 	autoAction: AutoAction | null,
 };
 
 /**  What the settings page displays: the settings plus the resolved destination folder. */
-export type SettingsView = SettingsView_Serialize | SettingsView_Deserialize;
-
-/**  What the settings page displays: the settings plus the resolved destination folder. */
-export type SettingsView_Deserialize = {
-	settings: Settings_Deserialize,
+export type SettingsView = {
+	settings: Settings,
 	saveFolder: string,
 	saveFolderDisplay: string,
 };
 
-/**  What the settings page displays: the settings plus the resolved destination folder. */
-export type SettingsView_Serialize = {
-	settings: Settings_Serialize,
-	saveFolder: string,
-	saveFolderDisplay: string,
-};
-
-export type Settings_Deserialize = {
-	version: number,
-	save: SaveSettings_Deserialize,
-	afterCapture: AfterCaptureSettings,
-	capture: CaptureSettings,
-	shortcuts: Shortcuts_Deserialize,
-	history: HistorySettings_Deserialize,
-	system: SystemSettings,
-	printScreen: PrintScreenSettings,
-	onboardingDone: boolean,
-};
-
-export type Settings_Serialize = {
-	version: number,
-	save: SaveSettings_Serialize,
-	afterCapture: AfterCaptureSettings,
-	capture: CaptureSettings,
-	shortcuts: Shortcuts_Serialize,
-	history: HistorySettings_Serialize,
-	system: SystemSettings,
-	printScreen: PrintScreenSettings,
-	onboardingDone: boolean,
-};
-
-export type Shortcuts = Shortcuts_Serialize | Shortcuts_Deserialize;
-
-export type Shortcuts_Deserialize = {
-	region?: string | null,
-	fullscreen?: string | null,
-	ocr?: string | null,
-	repeatRegion?: string | null,
-	openHistory?: string | null,
-};
-
-export type Shortcuts_Serialize = {
+export type Shortcuts = {
 	region: string | null,
 	fullscreen: string | null,
 	ocr: string | null,

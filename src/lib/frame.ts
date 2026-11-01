@@ -1,6 +1,6 @@
 // A frozen screen as Rust sends it: width (u32 LE), height (u32 LE), then RGBA pixels.
 
-export type Frame = { width: number; height: number; pixels: Uint8ClampedArray };
+export type Frame = { width: number; height: number; pixels: Uint8ClampedArray<ArrayBuffer> };
 
 export function decodeFrame(buf: ArrayBuffer): Frame {
   const view = new DataView(buf);

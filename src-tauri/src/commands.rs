@@ -111,6 +111,8 @@ pub async fn overlay_cancel(app: tauri::AppHandle) -> KResult<()> {
 /// Every command and event exposed to the front end.
 pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
+        // One TypeScript type per Rust type: Option<T> becomes T | null, never an optional field.
+        .disable_serde_phases()
         .commands(collect_commands![
             app_info,
             settings_get,
