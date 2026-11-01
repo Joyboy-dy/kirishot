@@ -34,3 +34,4 @@
 ### Limite connue de J1
 
 - Quand la fenêtre des réglages de Kirishot est active, Win + Maj + S et Impr. écran ouvrent l'outil de Windows : le hook clavier ne reçoit pas ces touches tant qu'une fenêtre WebView2 de Kirishot a le focus. Contournement : le menu de la zone de notification.
+- Pour la même raison, appuyer une seconde fois sur le raccourci pendant une sélection peut ouvrir l'outil de Windows par-dessus l'écran figé.
