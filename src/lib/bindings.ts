@@ -107,10 +107,6 @@ export type Point = {
 	y: number,
 };
 
-export type PrintScreenSettings = {
-	releasedByKirishot: boolean,
-};
-
 export type Rect = {
 	x: number,
 	y: number,
@@ -134,7 +130,6 @@ export type Settings = {
 	shortcuts: Shortcuts,
 	history: HistorySettings,
 	system: SystemSettings,
-	printScreen: PrintScreenSettings,
 	onboardingDone: boolean,
 };
 
@@ -159,6 +154,8 @@ export type SettingsView = {
 
 export type Shortcuts = {
 	region: string | null,
+	/**  A second region shortcut, for keyboards with a PrintScreen key. */
+	regionAlt: string | null,
 	fullscreen: string | null,
 	ocr: string | null,
 	repeatRegion: string | null,

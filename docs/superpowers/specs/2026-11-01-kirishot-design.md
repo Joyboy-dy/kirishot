@@ -45,7 +45,7 @@ Réponses données pendant la conception :
 
 ### Critères de réussite
 
-1. Après un appui sur Impr. écran, l'écran figé s'affiche en **moins de 150 ms** sur la machine de développement (mesure du spike, § 9).
+1. Après un appui sur le raccourci de capture, l'écran figé s'affiche en **moins de 150 ms** sur la machine de développement (mesure du spike, § 9).
 2. Une capture copiée se colle correctement dans Discord, Word, Paint et un navigateur basé sur Chromium.
 3. Aucune capture n'est perdue : même une capture seulement copiée reste dans l'historique pendant 30 jours (durée réglable).
 4. Les quatorze outils de l'éditeur fonctionnent, avec annuler et rétablir. L'image exportée est à la résolution native de la capture.
@@ -95,17 +95,17 @@ Tous les raccourcis se modifient dans Réglages › Raccourcis.
 
 | Action | Par défaut |
 |---|---|
-| Capturer une zone | `Impr. écran` |
-| Capturer l'écran entier (celui sous la souris) | `Maj + Impr. écran` |
+| Capturer une zone | `Win + Maj + S`, et aussi `Impr. écran` |
+| Capturer l'écran entier (celui sous la souris) | `Maj + Impr. écran`, ou le bouton « Plein écran » de la barre de sélection |
 | Capturer du texte (OCR) | `Ctrl + Impr. écran` |
 | Refaire la dernière zone | aucun |
 | Ouvrir l'historique | aucun |
 
-**Prendre la touche Impr. écran.** Sous Windows 11, la touche Impr. écran ouvre l'Outil Capture d'écran. Ce comportement dépend de la valeur `HKCU\Control Panel\Keyboard\PrintScreenKeyForSnippingEnabled`, au niveau de l'utilisateur, donc sans droits administrateur.
-- Au premier lancement, Kirishot détecte ce réglage et propose de le désactiver.
-- Il retient qu'il l'a changé (`printScreen.releasedByKirishot`).
-- Le réglage peut être rétabli à tout moment depuis Réglages › Raccourcis.
-- La désinstallation le rétablit si c'est Kirishot qui l'avait changé.
+**Reprendre les raccourcis de l'outil de Windows.** Win + Maj + S est le raccourci de capture que connaissent les utilisateurs de Windows, et il existe sur tous les claviers. Impr. écran manque sur beaucoup de portables, ou demande la touche Fn.
+- Windows réserve ces deux raccourcis à son Outil Capture d'écran. Kirishot les intercepte avec un hook clavier bas niveau, avant Windows, sans toucher au registre (décision du spike, `docs/spike-latence.md`).
+- Le hook n'avale une touche que si elle correspond à un raccourci de Kirishot : Alt + Impr. écran, Win + E et les autres combinaisons gardent leur comportement Windows.
+- Quand il avale une combinaison avec la touche Windows, il envoie une touche neutre, pour que relâcher Win n'ouvre pas le menu Démarrer.
+- Dans Réglages › Raccourcis, on peut rendre Win + Maj + S à Windows en le désactivant ou en choisissant un autre raccourci.
 
 ### 3.2 Sélection (plan de travail « Sélection de zone »)
 
@@ -236,7 +236,6 @@ Les onglets sont Général, Raccourcis, Capture, Historique et À propos.
   - Lancer Kirishot au démarrage de Windows.
   - Langue (Comme Windows, Français, English) et thème (Comme Windows, Sombre, Clair).
 - **Raccourcis**
-  - Si Impr. écran ouvre encore l'outil de Windows, un bandeau d'alerte s'affiche avec le bouton « Libérer la touche ».
   - Une ligne par action. On clique sur la ligne puis on appuie sur la nouvelle combinaison, et Échap annule.
   - Une combinaison déjà prise s'affiche en rouge avec « Déjà utilisé par une autre application ».
 - **Capture**
@@ -251,9 +250,9 @@ Les onglets sont Général, Raccourcis, Capture, Historique et À propos.
 
 Une boîte de dialogue en trois étapes :
 
-1. **Raccourci** : « Impr. écran → Capture de zone », avec l'explication sur l'outil de Windows. Les choix sont « Utiliser Impr. écran » (libère la touche) ou « Choisir un autre raccourci ».
+1. **Raccourci** : « Win + Maj + S → Capture de zone », avec l'explication : Kirishot remplace l'outil de capture de Windows sur ce raccourci, et Impr. écran marche aussi. Les choix sont « Continuer » ou « Choisir un autre raccourci ».
 2. **Destination et action** : le dossier (`Images\Kirishot`, modifiable) et l'action automatique.
-3. **Prêt** : « Lancer Kirishot au démarrage de Windows » (coché par défaut), puis l'invitation « Essayez : appuyez sur Impr. écran ».
+3. **Prêt** : « Lancer Kirishot au démarrage de Windows » (coché par défaut), puis l'invitation « Essayez : appuyez sur Win + Maj + S ».
 
 ---
 
@@ -289,7 +288,6 @@ Il y a un module par responsabilité. Chaque module expose une petite interface 
 | `output` | Découpe, encodage (PNG, JPG ou WebP), modèle de nom, écriture du fichier (avec repli), presse-papiers, fichier temporaire pour le glisser. | `settings` |
 | `ocr` | Reconnaissance avec `Windows.Media.Ocr` sur une région, qui renvoie des lignes avec leurs contours et la langue utilisée. | aucun |
 | `hotkeys` | Enregistrement des raccourcis globaux, détection des conflits, raccourci Échap temporaire. | `settings` |
-| `printscreen` | Lecture et écriture de `PrintScreenKeyForSnippingEnabled`. | aucun |
 | `history` | Rangement, index, miniatures, recherche, nettoyage selon la durée de conservation. | `output` |
 | `settings` | Lecture, écriture atomique, réparation et migration des réglages (serde), et événement `settings-changed`. | `paths` |
 | `windowing` | Création, placement et affichage des fenêtres (sélection, vignettes, compte à rebours, éditeur, épingles, principale). Recrée les fenêtres de sélection quand les écrans changent. | `capture` |
@@ -346,7 +344,7 @@ Ce sont les commandes principales. Leurs signatures exactes sont fixées dans le
 - **Capture** : `copy_capture(id)`, `save_capture(id, path?)`, `pin_capture(id)`, `open_editor(id)`, `start_drag(id)`.
 - **Éditeur** : `editor_load(id) → { document?, image_url }`, `editor_save_document(id, document)`, `editor_export(id, png_bytes, action: Copy | Save | SaveAs(path) | Pin)`.
 - **Historique** : `history_list(query, filter, cursor)`, `history_delete(id)`, `history_clear()`, `reveal_in_explorer(id)`.
-- **Réglages** : `settings_get()`, `settings_update(patch)`, `hotkey_set(action, accelerator) → Ok | Conflict`, `printscreen_status()`, `printscreen_release()`, `printscreen_restore()`.
+- **Réglages** : `settings_get()`, `settings_update(patch)`, `hotkey_set(action, accelerator) → Ok | Conflict`.
 - **Événements** de Rust vers le front : `capture-ready` (vers les fenêtres de sélection), `thumbnail-push`, `thumbnail-update`, `settings-changed`, `history-changed`.
 
 **Accès aux pixels** : les images figées passent par le protocole `kirishot`. Sous Windows, WebView2 l'expose à l'adresse `http://kirishot.localhost/capture/<id>/<écran>`.
@@ -467,7 +465,8 @@ Kirishot n'utilise pas l'historique du presse-papiers de Windows : il garde son 
     "commitOnRelease": false
   },
   "shortcuts": {
-    "region": "PrintScreen",
+    "region": "Super+Shift+S",
+    "regionAlt": "PrintScreen",
     "fullscreen": "Shift+PrintScreen",
     "ocr": "Ctrl+PrintScreen",
     "repeatRegion": null,
@@ -480,7 +479,6 @@ Kirishot n'utilise pas l'historique du presse-papiers de Windows : il garde son 
     "theme": "system",
     "checkUpdates": true
   },
-  "printScreen": { "releasedByKirishot": false },
   "onboardingDone": false
 }
 ```
@@ -572,7 +570,7 @@ Si le fichier existe déjà, Kirishot ajoute ` (2)`, ` (3)`, etc.
 | Écrans avec des échelles différentes | Une fenêtre de sélection par écran, et des conversions centralisées dans `geometry.ts`. |
 | Écran branché, débranché, ou échelle modifiée | Vérification à chaque capture : les fenêtres de sélection qui ne correspondent plus sont recréées. Cela ajoute de la latence uniquement après un changement. |
 | Raccourci déjà pris par une autre application | Une notification Windows s'affiche, et le champ passe en rouge dans Réglages › Raccourcis. Les autres raccourcis continuent de fonctionner. |
-| Impr. écran encore réservée par Windows | Un bandeau dans Réglages › Raccourcis, avec le bouton « Libérer la touche ». |
+| Hook clavier impossible à installer | Une notification, et le champ du raccourci passe en rouge. Les raccourcis gérés par le plugin continuent de fonctionner. |
 | Dossier de destination inaccessible (supprimé, disque débranché, droits) | Kirishot enregistre dans `Images\Kirishot` et prévient par une notification. La capture est de toute façon dans l'historique. |
 | Disque plein | Une notification d'erreur. La capture reste en mémoire tant que la vignette ou l'éditeur est ouvert, ce qui permet de la copier. |
 | Langue OCR manquante | Un message qui explique comment ajouter une langue dans Windows, avec un lien vers les paramètres de langue. |
@@ -632,7 +630,7 @@ Le code du spike est jetable. Seules les mesures et la décision sont gardées, 
   - OCR en français et en anglais ;
   - glisser une vignette vers l'Explorateur et vers Discord ;
   - dossier de destination supprimé ;
-  - Impr. écran libérée, puis rétablie ;
+  - Win + Maj + S et Impr. écran ouvrent Kirishot, et non l'outil de Windows ; le menu Démarrer ne s'ouvre pas ;
   - mise à jour automatique depuis la version précédente.
 - **CI GitHub Actions** (`windows-latest`), à chaque push et sur chaque pull request :
   - `pnpm lint` ;
@@ -647,7 +645,7 @@ Le code du spike est jetable. Seules les mesures et la décision sont gardées, 
 
 ## 11. Distribution et dépôt
 
-- **Installeur** : NSIS (`.exe`), installé pour l'utilisateur courant, donc sans droits administrateur. La désinstallation rétablit Impr. écran si Kirishot l'avait libérée (hook NSIS).
+- **Installeur** : NSIS (`.exe`), installé pour l'utilisateur courant, donc sans droits administrateur.
 - **Mises à jour** : `tauri-plugin-updater`, avec un `latest.json` publié dans les GitHub Releases.
   - Les mises à jour sont signées par la clé Tauri, qui est gardée dans les secrets GitHub.
   - Kirishot vérifie au démarrage, puis toutes les 24 heures.
@@ -686,7 +684,7 @@ Le code du spike est jetable. Seules les mesures et la décision sont gardées, 
 | Risque | Parade |
 |---|---|
 | Latence de l'écran figé au-dessus de 150 ms | Spike en premier (§ 9), avec une solution de repli native prévue par l'architecture. |
-| Impr. écran impossible à enregistrer | Hook clavier bas niveau pour cette touche, vérifié dans le spike. |
+| Impr. écran et Win + Maj + S réservés par Windows | Hook clavier bas niveau, vérifié dans le spike et en J1. |
 | Rendu suspendu dans les webviews cachées | Vérifié dans le spike, avec un affichage hors écran en repli. |
 | Mémoire au repos trop élevée à cause des webviews créées d'avance | Mesurée dans le spike. Si besoin, seule la fenêtre de l'écran principal est gardée d'avance. |
 | SmartScreen fait fuir les premiers utilisateurs | Explication dans le README, puis une demande à SignPath. |
@@ -706,4 +704,4 @@ La v1 est trop grosse pour un seul plan d'implémentation. Elle est construite e
 | **J3** | Éditeur : modèle de document, annuler et rétablir, export, puis les outils Sélection, Recadrer, Flèche, Ligne, Rectangle, Ellipse, Crayon, Texte, Étapes. | Annoter puis copier ou enregistrer. |
 | **J4** | Outils Surligneur, Flouter, Projecteur, Loupe, Pipette, puis le panneau Embellir. | L'éditeur complet. |
 | **J5** | OCR, retardateur, épingles, Refaire la dernière zone. | Les extras de la v1. |
-| **J6** | Premier lancement, libération d'Impr. écran, réglages complets, traduction anglaise, installeur, mises à jour, README, première Release. | La version 0.1.0 publiable. |
+| **J6** | Premier lancement, réglages complets, traduction anglaise, installeur, mises à jour, README, première Release. | La version 0.1.0 publiable. |

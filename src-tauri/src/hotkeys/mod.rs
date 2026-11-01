@@ -29,6 +29,7 @@ impl HotkeyAction {
 pub fn bindings(s: &Shortcuts) -> Vec<(HotkeyAction, String)> {
     [
         (HotkeyAction::Region, &s.region),
+        (HotkeyAction::Region, &s.region_alt),
         (HotkeyAction::Fullscreen, &s.fullscreen),
     ]
     .into_iter()
@@ -36,30 +37,30 @@ pub fn bindings(s: &Shortcuts) -> Vec<(HotkeyAction, String)> {
     .collect()
 }
 
-/// Keeps the PrintScreen hook installed for the life of the app.
+/// Keeps the keyboard hook installed for the life of the app.
 struct HookState(#[allow(dead_code)] ll_hook::HookGuard);
 
-/// Registers every binding: PrintScreen combinations through the low-level hook, the others
-/// through the global-shortcut plugin. A shortcut taken by another application is reported,
-/// not fatal.
+/// Registers every binding: PrintScreen and Windows-key combinations through the low-level
+/// hook, the others through the global-shortcut plugin. A shortcut taken by another
+/// application is reported, not fatal.
 pub fn register_all(app: &tauri::AppHandle, s: &Shortcuts) {
-    let mut printscreen = Vec::new();
+    let mut hooked = Vec::new();
     for (action, accel) in bindings(s) {
-        match ll_hook::printscreen_mods(&accel) {
-            Some(mods) => {
+        match ll_hook::parse_hook_accel(&accel) {
+            Some(key) => {
                 log::debug!("{accel}: low-level hook");
-                printscreen.push((mods, action));
+                hooked.push((key, action));
             }
             None => register_with_plugin(app, action, &accel),
         }
     }
-    if printscreen.is_empty() {
+    if hooked.is_empty() {
         return;
     }
     let handle = app.clone();
-    // Combinations without a binding (Alt+PrintScreen…) keep their Windows behavior.
-    let installed = ll_hook::install_printscreen_hook(move |mods| {
-        let Some((_, action)) = printscreen.iter().find(|(m, _)| *m == mods) else {
+    // Keys without a binding (Alt+PrintScreen, Win+E…) keep their Windows behavior.
+    let installed = ll_hook::install_hook(move |pressed| {
+        let Some((_, action)) = hooked.iter().find(|(k, _)| *k == pressed) else {
             return false;
         };
         flow::start(&handle, action.mode(), Instant::now());
@@ -67,7 +68,7 @@ pub fn register_all(app: &tauri::AppHandle, s: &Shortcuts) {
     });
     match installed {
         Ok(guard) => {
-            log::info!("PrintScreen hook installed");
+            log::info!("keyboard hook installed");
             app.manage(HookState(guard));
         }
         Err(e) => {
@@ -75,7 +76,7 @@ pub fn register_all(app: &tauri::AppHandle, s: &Shortcuts) {
             notify::show(
                 app,
                 messages::SHORTCUT_CONFLICT_TITLE,
-                &messages::shortcut_conflict("Impr. écran"),
+                &messages::shortcut_conflict("Win + Maj + S"),
             );
         }
     }
@@ -109,6 +110,7 @@ mod tests {
         assert_eq!(
             bindings(&Settings::default().shortcuts),
             vec![
+                (HotkeyAction::Region, "Super+Shift+S".to_string()),
                 (HotkeyAction::Region, "PrintScreen".to_string()),
                 (HotkeyAction::Fullscreen, "Shift+PrintScreen".to_string())
             ]
@@ -118,10 +120,11 @@ mod tests {
     #[test]
     fn null_shortcuts_are_skipped() {
         let mut s = Settings::default().shortcuts;
+        s.region_alt = None;
         s.fullscreen = None;
         assert_eq!(
             bindings(&s),
-            vec![(HotkeyAction::Region, "PrintScreen".to_string())]
+            vec![(HotkeyAction::Region, "Super+Shift+S".to_string())]
         );
     }
 }

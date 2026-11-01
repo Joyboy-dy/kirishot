@@ -1,14 +1,14 @@
-//! Low-level keyboard hook for PrintScreen. `RegisterHotKey` accepts PrintScreen but never
-//! receives it (spike J0); a `WH_KEYBOARD_LL` hook sees the key before Windows does, so Kirishot
-//! gets it even while the Windows setting still assigns it to the Snipping Tool.
-use std::sync::atomic::{AtomicBool, Ordering};
+//! Low-level keyboard hook for the shortcuts Windows keeps for itself. `RegisterHotKey` accepts
+//! PrintScreen but never receives it (spike J0), and Win+Shift+S belongs to the Snipping Tool.
+//! A `WH_KEYBOARD_LL` hook sees keys before Windows does, so Kirishot gets them first.
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, VK_CONTROL, VK_MENU, VK_SHIFT,
+    GetAsyncKeyState, KEYEVENTF_KEYUP, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT, keybd_event,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, GetMessageW, KBDLLHOOKSTRUCT, MSG, PostThreadMessageW, SetWindowsHookExW,
@@ -18,44 +18,56 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use crate::error::{ErrorCode, KResult, KirishotError};
 
 const VK_SNAPSHOT: u32 = 0x2C;
+/// An unassigned virtual key, sent so that releasing Win does not open the Start menu.
+const VK_DUMMY: u8 = 0xFF;
 
-/// Modifiers held with PrintScreen.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Mods {
     pub shift: bool,
     pub ctrl: bool,
     pub alt: bool,
+    pub win: bool,
 }
 
-/// Returns `true` when the key was handled and must be swallowed.
-type OnPress = Arc<dyn Fn(Mods) -> bool + Send + Sync>;
-
-static ON_PRESS: Mutex<Option<OnPress>> = Mutex::new(None);
-/// Whether the last PrintScreen press was swallowed, so its release is swallowed too.
-static SWALLOWED: AtomicBool = AtomicBool::new(false);
-
-pub(crate) fn decide(vk: u32, key_down: bool) -> bool {
-    vk == VK_SNAPSHOT && key_down
+/// A key and the modifiers held with it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HookKey {
+    pub vk: u32,
+    pub mods: Mods,
 }
 
-/// The modifiers of a PrintScreen accelerator such as `Shift+PrintScreen`; `None` for any other
-/// key or modifier.
-pub(crate) fn printscreen_mods(accel: &str) -> Option<Mods> {
+/// The hook key of an accelerator such as `Shift+PrintScreen` or `Super+Shift+S`, when the hook
+/// must handle it: PrintScreen combinations and any combination with the Windows key. `None`
+/// for everything else, which the global-shortcut plugin registers.
+pub(crate) fn parse_hook_accel(accel: &str) -> Option<HookKey> {
     let mut parts: Vec<&str> = accel.split('+').map(str::trim).collect();
-    if parts.pop()? != "PrintScreen" {
-        return None;
-    }
+    let key = parts.pop()?;
+    let vk = match key {
+        "PrintScreen" => VK_SNAPSHOT,
+        k if k.len() == 1 && k.chars().all(|c| c.is_ascii_alphanumeric()) => {
+            k.to_ascii_uppercase().as_bytes()[0] as u32
+        }
+        _ => return None,
+    };
     let mut mods = Mods::default();
     for part in parts {
         match part.to_ascii_lowercase().as_str() {
             "shift" => mods.shift = true,
             "ctrl" | "control" => mods.ctrl = true,
             "alt" => mods.alt = true,
+            "super" | "win" | "meta" => mods.win = true,
             _ => return None,
         }
     }
-    Some(mods)
+    (vk == VK_SNAPSHOT || mods.win).then_some(HookKey { vk, mods })
 }
+
+/// Returns `true` when the key was handled and must be swallowed.
+type OnPress = Arc<dyn Fn(HookKey) -> bool + Send + Sync>;
+
+static ON_PRESS: Mutex<Option<OnPress>> = Mutex::new(None);
+/// The key whose press was swallowed, so its release is swallowed too (0: none).
+static SWALLOWED: AtomicU32 = AtomicU32::new(0);
 
 /// Uninstalls the hook when dropped.
 pub struct HookGuard {
@@ -76,30 +88,40 @@ fn held(vk: u16) -> bool {
 unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code >= 0 {
         let key = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
-        if key.vkCode == VK_SNAPSHOT {
-            let down = matches!(wparam.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN);
-            if decide(key.vkCode, down) {
-                let mods = Mods {
+        let down = matches!(wparam.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN);
+        if down {
+            let pressed = HookKey {
+                vk: key.vkCode,
+                mods: Mods {
                     shift: held(VK_SHIFT.0),
                     ctrl: held(VK_CONTROL.0),
                     alt: held(VK_MENU.0),
-                };
-                // Clone the callback out of the lock: it must stay short, Windows drops slow hooks.
-                let on_press = ON_PRESS.lock().unwrap().clone();
-                let handled = on_press.is_some_and(|f| f(mods));
-                SWALLOWED.store(handled, Ordering::SeqCst);
-            }
-            if SWALLOWED.load(Ordering::SeqCst) {
+                    win: held(VK_LWIN.0) || held(VK_RWIN.0),
+                },
+            };
+            // Clone the callback out of the lock: it must stay short, Windows drops slow hooks.
+            let on_press = ON_PRESS.lock().unwrap().clone();
+            if on_press.is_some_and(|f| f(pressed)) {
+                SWALLOWED.store(key.vkCode, Ordering::SeqCst);
+                if pressed.mods.win {
+                    unsafe {
+                        keybd_event(VK_DUMMY, 0, Default::default(), 0);
+                        keybd_event(VK_DUMMY, 0, KEYEVENTF_KEYUP, 0);
+                    }
+                }
                 return LRESULT(1);
             }
+        } else if SWALLOWED.load(Ordering::SeqCst) == key.vkCode {
+            SWALLOWED.store(0, Ordering::SeqCst);
+            return LRESULT(1);
         }
     }
     unsafe { CallNextHookEx(None, code, wparam, lparam) }
 }
 
 /// Installs the hook on a dedicated thread with its own message loop.
-pub fn install_printscreen_hook(
-    on_press: impl Fn(Mods) -> bool + Send + Sync + 'static,
+pub fn install_hook(
+    on_press: impl Fn(HookKey) -> bool + Send + Sync + 'static,
 ) -> KResult<HookGuard> {
     *ON_PRESS.lock().unwrap() = Some(Arc::new(on_press));
     let (tx, rx) = mpsc::channel();
@@ -120,7 +142,7 @@ pub fn install_printscreen_hook(
         Ok(Ok(thread_id)) => Ok(HookGuard { thread_id }),
         Ok(Err(e)) => Err(KirishotError::new(
             ErrorCode::Shortcut,
-            format!("Impossible d'intercepter Impr. écran : {e}"),
+            format!("Impossible d'intercepter les raccourcis : {e}"),
         )),
         Err(e) => Err(KirishotError::new(ErrorCode::Shortcut, e.to_string())),
     }
@@ -130,32 +152,36 @@ pub fn install_printscreen_hook(
 mod tests {
     use super::*;
 
-    #[test]
-    fn decide_only_reacts_to_printscreen_down() {
-        assert!(decide(0x2C, true));
-        assert!(!decide(0x2C, false));
-        assert!(!decide(0x41, true));
+    fn key(vk: u32, shift: bool, win: bool) -> Option<HookKey> {
+        Some(HookKey {
+            vk,
+            mods: Mods {
+                shift,
+                win,
+                ..Mods::default()
+            },
+        })
     }
 
     #[test]
-    fn printscreen_mods_parses_accelerators() {
-        assert_eq!(printscreen_mods("PrintScreen"), Some(Mods::default()));
+    fn printscreen_accelerators_go_to_the_hook() {
+        assert_eq!(parse_hook_accel("PrintScreen"), key(0x2C, false, false));
         assert_eq!(
-            printscreen_mods("Shift+PrintScreen"),
-            Some(Mods {
-                shift: true,
-                ..Mods::default()
-            })
+            parse_hook_accel("Shift+PrintScreen"),
+            key(0x2C, true, false)
         );
-        assert_eq!(
-            printscreen_mods("Ctrl+Shift+PrintScreen"),
-            Some(Mods {
-                shift: true,
-                ctrl: true,
-                alt: false
-            })
-        );
-        assert_eq!(printscreen_mods("Ctrl+Alt+K"), None);
-        assert_eq!(printscreen_mods("Super+PrintScreen"), None);
+    }
+
+    #[test]
+    fn windows_key_accelerators_go_to_the_hook() {
+        assert_eq!(parse_hook_accel("Super+Shift+S"), key(0x53, true, true));
+        assert_eq!(parse_hook_accel("Win+Shift+s"), key(0x53, true, true));
+    }
+
+    #[test]
+    fn other_accelerators_stay_with_the_plugin() {
+        assert_eq!(parse_hook_accel("Ctrl+Alt+K"), None);
+        assert_eq!(parse_hook_accel("Super+F13"), None);
+        assert_eq!(parse_hook_accel("Hyper+PrintScreen"), None);
     }
 }

@@ -13,7 +13,6 @@ pub struct Settings {
     pub shortcuts: Shortcuts,
     pub history: HistorySettings,
     pub system: SystemSettings,
-    pub print_screen: PrintScreenSettings,
     pub onboarding_done: bool,
 }
 
@@ -48,6 +47,8 @@ pub struct CaptureSettings {
 #[serde(rename_all = "camelCase")]
 pub struct Shortcuts {
     pub region: Option<String>,
+    /// A second region shortcut, for keyboards with a PrintScreen key.
+    pub region_alt: Option<String>,
     pub fullscreen: Option<String>,
     pub ocr: Option<String>,
     pub repeat_region: Option<String>,
@@ -68,12 +69,6 @@ pub struct SystemSettings {
     pub language: Language,
     pub theme: Theme,
     pub check_updates: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
-#[serde(rename_all = "camelCase")]
-pub struct PrintScreenSettings {
-    pub released_by_kirishot: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
@@ -140,7 +135,8 @@ impl Default for Settings {
                 commit_on_release: false,
             },
             shortcuts: Shortcuts {
-                region: Some("PrintScreen".into()),
+                region: Some("Super+Shift+S".into()),
+                region_alt: Some("PrintScreen".into()),
                 fullscreen: Some("Shift+PrintScreen".into()),
                 ocr: Some("Ctrl+PrintScreen".into()),
                 repeat_region: None,
@@ -154,9 +150,6 @@ impl Default for Settings {
                 language: Language::Auto,
                 theme: Theme::System,
                 check_updates: true,
-            },
-            print_screen: PrintScreenSettings {
-                released_by_kirishot: false,
             },
             onboarding_done: false,
         }
@@ -219,14 +212,13 @@ mod tests {
         );
         assert_eq!(
             v["shortcuts"],
-            json!({"region": "PrintScreen", "fullscreen": "Shift+PrintScreen", "ocr": "Ctrl+PrintScreen", "repeatRegion": null, "openHistory": null})
+            json!({"region": "Super+Shift+S", "regionAlt": "PrintScreen", "fullscreen": "Shift+PrintScreen", "ocr": "Ctrl+PrintScreen", "repeatRegion": null, "openHistory": null})
         );
         assert_eq!(v["history"], json!({"retentionDays": 30}));
         assert_eq!(
             v["system"],
             json!({"launchAtStartup": true, "language": "auto", "theme": "system", "checkUpdates": true})
         );
-        assert_eq!(v["printScreen"], json!({"releasedByKirishot": false}));
         assert_eq!(v["onboardingDone"], false);
     }
 
