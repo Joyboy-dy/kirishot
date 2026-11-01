@@ -271,7 +271,6 @@ Tauri 2, React 19, TypeScript, Vite, Tailwind 4 et shadcn/ui, avec pnpm, comme d
 - `single-instance` ;
 - `autostart` ;
 - `global-shortcut` ;
-- `store` (réglages) ;
 - `updater` ;
 - `notification` (erreurs et alertes) ;
 - `dialog` (choix du dossier, Enregistrer sous) ;
@@ -292,7 +291,7 @@ Il y a un module par responsabilité. Chaque module expose une petite interface 
 | `hotkeys` | Enregistrement des raccourcis globaux, détection des conflits, raccourci Échap temporaire. | `settings` |
 | `printscreen` | Lecture et écriture de `PrintScreenKeyForSnippingEnabled`. | aucun |
 | `history` | Rangement, index, miniatures, recherche, nettoyage selon la durée de conservation. | `output` |
-| `settings` | Lecture, écriture et migration des réglages, et événement `settings-changed`. | `tauri-plugin-store` |
+| `settings` | Lecture, écriture atomique, réparation et migration des réglages (serde), et événement `settings-changed`. | `paths` |
 | `windowing` | Création, placement et affichage des fenêtres (sélection, vignettes, compte à rebours, éditeur, épingles, principale). Recrée les fenêtres de sélection quand les écrans changent. | `capture` |
 | `flow` | L'orchestration : raccourci → capture → sélection → vignette → action automatique. C'est le seul module qui enchaîne les autres. | tous |
 | `commands` | Les commandes exposées au front, déclarées pour tauri-specta. | `flow` et les autres modules |

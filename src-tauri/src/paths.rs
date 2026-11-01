@@ -30,7 +30,9 @@ pub fn default_save_folder(app: &tauri::AppHandle) -> KResult<PathBuf> {
     app.path()
         .picture_dir()
         .map(|dir| dir.join("Kirishot"))
-        .map_err(|e| KirishotError::new(ErrorCode::Save, format!("Dossier Images introuvable : {e}")))
+        .map_err(|e| {
+            KirishotError::new(ErrorCode::Save, format!("Dossier Images introuvable : {e}"))
+        })
 }
 
 #[cfg(test)]

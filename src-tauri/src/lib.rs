@@ -4,6 +4,9 @@ mod logging;
 mod messages;
 mod notify;
 mod paths;
+mod settings;
+
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -21,14 +24,36 @@ pub fn run() {
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
-            log::info!("{} {} started", messages::APP_NAME, env!("CARGO_PKG_VERSION"));
+            let loaded = settings::store::load(&paths::settings_file());
+            for warning in &loaded.warnings {
+                log::warn!("settings: {warning}");
+            }
+            if loaded.reset_from_corrupt {
+                notify::show(
+                    app.handle(),
+                    messages::SETTINGS_RESET_TITLE,
+                    messages::SETTINGS_RESET_BODY,
+                );
+            }
+            app.manage(settings::SettingsState::new(
+                paths::settings_file(),
+                loaded.settings,
+            ));
+            log::info!(
+                "{} {} started",
+                messages::APP_NAME,
+                env!("CARGO_PKG_VERSION")
+            );
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while building Kirishot")
         .run(|_app, event| {
             // Kirishot lives in the tray: closing the last window must not quit it.
-            if let tauri::RunEvent::ExitRequested { code: None, api, .. } = event {
+            if let tauri::RunEvent::ExitRequested {
+                code: None, api, ..
+            } = event
+            {
                 api.prevent_exit();
             }
         });

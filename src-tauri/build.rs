@@ -7,7 +7,11 @@ fn main() {
         tauri_build::Attributes::new()
             .windows_attributes(windows)
             // App commands must be listed here so each window's capability can allow them one by one.
-            .app_manifest(tauri_build::AppManifest::new().commands(&["app_info"])),
+            .app_manifest(tauri_build::AppManifest::new().commands(&[
+                "app_info",
+                "settings_get",
+                "settings_update",
+            ])),
     )
     .expect("failed to run tauri-build");
 
