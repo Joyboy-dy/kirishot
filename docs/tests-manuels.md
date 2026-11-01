@@ -29,7 +29,7 @@
 15. « Changer… » vers un autre dossier : la capture suivante y arrive, et « Revenir au dossier par défaut » apparaît.
 16. JPG donne un fichier `.jpg`.
 17. « Copier seulement » ne crée aucun fichier, et Ctrl+V dans Paint colle l'image.
-18. Dossier de destination supprimé ou clé USB débranchée : la capture arrive dans `Images\Kirishot`, avec la notification « Dossier de destination inaccessible ».
+18. Dossier de destination supprimé : Kirishot le recrée et y enregistre la capture. Clé USB débranchée : la capture arrive dans `Images\Kirishot`, avec la notification « Dossier de destination inaccessible ».
 
 ### Limite connue de J1
 
