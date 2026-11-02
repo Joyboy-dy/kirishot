@@ -33,6 +33,13 @@ fn main() {
                 "editor_export",
                 "editor_autosave",
                 "play_shutter_preview",
+                "history_list",
+                "history_thumb_path",
+                "history_copy",
+                "history_edit",
+                "history_reveal",
+                "history_delete",
+                "history_clear",
             ])),
     )
     .expect("failed to run tauri-build");

@@ -107,16 +107,6 @@ pub fn open(app: &tauri::AppHandle, id: &str) -> KResult<()> {
             format!("Capture trop grande pour l'éditeur ({width} × {height})"),
         ));
     }
-    // The original is kept beside the document, written off the main thread.
-    let original = shot.image.clone();
-    let original_id = id.to_string();
-    std::thread::spawn(move || {
-        let written = crate::output::encode_png(&original)
-            .and_then(|png| write_original(&crate::paths::captures_dir(), &original_id, &png));
-        if let Err(e) = written {
-            log::warn!("cannot keep the original of {original_id}: {e}");
-        }
-    });
     let title = editor_title(shot.meta.taken_at.naive_local());
     let session = EditorSession {
         capture_id: id.to_string(),
@@ -218,6 +208,7 @@ pub fn export(
         .get(capture_id)
         .map(|s| s.meta)
         .ok_or_else(|| KirishotError::new(ErrorCode::NoActiveCapture, "Capture introuvable"))?;
+    let png_for_history = png.clone();
     let mut result = ExportResult {
         saved: None,
         copied: false,
@@ -238,6 +229,16 @@ pub fn export(
             Some(path) => result.saved = Some(path),
             None => result.cancelled = true,
         },
+    }
+    // The history follows: where it was saved, that it was copied, and the annotated image.
+    if let Some(path) = &result.saved {
+        crate::history::mark_saved(app, capture_id, std::path::Path::new(path));
+    }
+    if result.copied {
+        crate::history::mark_copied(app, capture_id);
+    }
+    if !result.cancelled && has_annotations(&crate::paths::history_dir(), capture_id) {
+        crate::history::mark_annotated(app, capture_id, &png_for_history);
     }
     if intent == ExportIntent::CopyAndClose {
         let handle = app.clone();
@@ -305,9 +306,17 @@ pub fn write_document(root: &std::path::Path, id: &str, json: &str) -> KResult<s
     write_atomic(&capture_dir(root, id)?, "document.json", json.as_bytes())
 }
 
-/// Writes `captures/<id>/original.png`, the capture before any annotation.
-pub fn write_original(root: &std::path::Path, id: &str, png: &[u8]) -> KResult<std::path::PathBuf> {
-    write_atomic(&capture_dir(root, id)?, "original.png", png)
+/// Whether the autosaved document of `id` has annotations or a crop.
+pub fn has_annotations(root: &std::path::Path, id: &str) -> bool {
+    let Ok(dir) = capture_dir(root, id) else {
+        return false;
+    };
+    let Ok(json) = std::fs::read(dir.join(crate::history::index::DOCUMENT_FILE)) else {
+        return false;
+    };
+    serde_json::from_slice::<serde_json::Value>(&json).is_ok_and(|doc| {
+        doc["annotations"].as_array().is_some_and(|a| !a.is_empty()) || !doc["crop"].is_null()
+    })
 }
 
 fn capture_dir(root: &std::path::Path, id: &str) -> KResult<std::path::PathBuf> {
@@ -397,6 +406,22 @@ mod tests {
     fn parse_intent_rejects_missing_or_unknown() {
         assert!(parse_intent(None).is_err());
         assert!(parse_intent(Some("print")).is_err());
+    }
+
+    #[test]
+    fn has_annotations_reads_the_autosaved_document() {
+        let dir = tempfile::tempdir().unwrap();
+        let id = ulid::Ulid::generate().to_string();
+        assert!(!has_annotations(dir.path(), &id));
+        write_document(dir.path(), &id, r#"{"annotations":[],"crop":null}"#).unwrap();
+        assert!(!has_annotations(dir.path(), &id));
+        write_document(
+            dir.path(),
+            &id,
+            r#"{"annotations":[{"id":"a"}],"crop":null}"#,
+        )
+        .unwrap();
+        assert!(has_annotations(dir.path(), &id));
     }
 
     #[test]

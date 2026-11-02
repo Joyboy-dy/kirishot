@@ -12,6 +12,7 @@ use crate::capture::{
 };
 use crate::error::{ErrorCode, KResult, KirishotError};
 use crate::geometry::{Point, monitor_at_point, resolve_target, windows_for_monitor};
+use crate::history::{self, index::SourceKind};
 use crate::output::{CaptureMeta, deliver};
 use crate::settings::SettingsState;
 use crate::settings::model::{AutoAction, CaptureMode, StartModeSetting, ToolbarPosition};
@@ -137,11 +138,16 @@ pub fn route(s: &crate::settings::model::Settings, thumbnails_alive: bool) -> Ro
 }
 
 /// « Toujours ouvrir l'éditeur »: no thumbnail and no automatic action.
-fn open_in_editor(app: &tauri::AppHandle, img: image::RgbaImage, meta: CaptureMeta) -> KResult<()> {
+fn open_in_editor(
+    app: &tauri::AppHandle,
+    id: &str,
+    img: image::RgbaImage,
+    meta: CaptureMeta,
+) -> KResult<()> {
     let action = app.state::<SettingsState>().get().after_capture.auto_action;
-    let id = app
-        .state::<crate::shots::ShotStore>()
-        .insert(img, meta, action);
+    app.state::<crate::shots::ShotStore>()
+        .insert_with_id(id, img, meta, action);
+    let id = id.to_string();
     let (tx, rx) = std::sync::mpsc::channel();
     let handle = app.clone();
     app.run_on_main_thread(move || {
@@ -159,11 +165,16 @@ fn after_capture(
     img: image::RgbaImage,
     meta: CaptureMeta,
     monitor: &MonitorInfo,
+    kind: SourceKind,
     copy_only: bool,
 ) {
+    // Every capture enters the history, under the id the thumbnail and the editor use too.
+    let id = ulid::Ulid::generate().to_string();
+    history::record(app, &id, &img, &meta, history::source(kind, &meta));
     if copy_only {
-        if let Err(e) = deliver(app, &img, &meta, AutoAction::Copy) {
-            notify::failure(app, &e);
+        match deliver(app, &img, &meta, AutoAction::Copy) {
+            Ok(delivery) => history_delivery(app, &id, &delivery),
+            Err(e) => notify::failure(app, &e),
         }
         return;
     }
@@ -173,26 +184,49 @@ fn after_capture(
         Route::Immediate => None,
         Route::Thumbnail if alive => Some(crate::thumbnails::push(
             app,
+            &id,
             img.clone(),
             meta.clone(),
             monitor,
         )),
-        Route::Editor => Some(open_in_editor(app, img.clone(), meta.clone())),
+        Route::Editor => Some(open_in_editor(app, &id, img.clone(), meta.clone())),
         Route::Thumbnail => None,
     };
     match pushed {
         Some(Ok(())) => {}
         Some(Err(e)) => {
             log::error!("thumbnail failed, falling back: {e}");
-            report(
-                app,
-                deliver(app, &img, &meta, settings.after_capture.auto_action),
-            );
+            let delivered = deliver(app, &img, &meta, settings.after_capture.auto_action);
+            if let Ok(d) = &delivered {
+                history_delivery(app, &id, d);
+            }
+            report(app, delivered);
         }
-        None => report(
-            app,
-            deliver(app, &img, &meta, settings.after_capture.auto_action),
-        ),
+        None => {
+            let delivered = deliver(app, &img, &meta, settings.after_capture.auto_action);
+            if let Ok(d) = &delivered {
+                history_delivery(app, &id, d);
+            }
+            report(app, delivered);
+        }
+    }
+}
+
+/// What an immediate delivery did, written to the capture's history entry.
+fn history_delivery(app: &tauri::AppHandle, id: &str, d: &crate::output::Delivery) {
+    if let Some(saved) = &d.saved {
+        history::mark_saved(app, id, &saved.path);
+    }
+    if d.copied {
+        history::mark_copied(app, id);
+    }
+}
+
+fn source_kind(target: &CommitTarget) -> SourceKind {
+    match target {
+        CommitTarget::Region { .. } => SourceKind::Region,
+        CommitTarget::Window { .. } => SourceKind::Window,
+        CommitTarget::Monitor => SourceKind::Fullscreen,
     }
 }
 
@@ -317,7 +351,7 @@ fn run_fullscreen(app: &tauri::AppHandle) -> KResult<()> {
     };
     let monitor = shot.info.clone();
     app.state::<FlowState>().finish();
-    after_capture(app, img, meta, &monitor, false);
+    after_capture(app, img, meta, &monitor, SourceKind::Fullscreen, false);
     Ok(())
 }
 
@@ -406,11 +440,12 @@ pub fn commit(
         window_title: title,
     };
     let monitor = shot.info.clone();
+    let kind = source_kind(&target);
     drop(session);
     end_selection(app);
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        after_capture(&app, img, meta, &monitor, copy_only)
+        after_capture(&app, img, meta, &monitor, kind, copy_only)
     });
     Ok(())
 }

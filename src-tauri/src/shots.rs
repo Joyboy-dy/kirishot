@@ -46,8 +46,21 @@ pub struct ShotStore {
 }
 
 impl ShotStore {
+    #[cfg(test)]
     pub fn insert(&self, image: RgbaImage, meta: CaptureMeta, action: AutoAction) -> String {
         let id = ulid::Ulid::generate().to_string();
+        self.insert_with_id(&id, image, meta, action);
+        id
+    }
+
+    /// Keeps a capture under a known id: the history's, so both name the same capture.
+    pub fn insert_with_id(
+        &self,
+        id: &str,
+        image: RgbaImage,
+        meta: CaptureMeta,
+        action: AutoAction,
+    ) {
         let shot = Shot {
             image: Arc::new(image),
             meta,
@@ -55,8 +68,7 @@ impl ShotStore {
             state: ShotState::Pending,
             temp_png: None,
         };
-        self.shots.lock().unwrap().insert(id.clone(), shot);
-        id
+        self.shots.lock().unwrap().insert(id.to_string(), shot);
     }
 
     pub fn get(&self, id: &str) -> Option<ShotView> {

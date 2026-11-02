@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-history-thumb-path"
+description = "Enables the history_thumb_path command without any pre-configured scope."
+commands.allow = ["history_thumb_path"]
+
+[[permission]]
+identifier = "deny-history-thumb-path"
+description = "Denies the history_thumb_path command without any pre-configured scope."
+commands.deny = ["history_thumb_path"]

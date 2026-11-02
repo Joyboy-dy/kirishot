@@ -26,9 +26,14 @@ pub fn temp_dir() -> PathBuf {
     std::env::temp_dir().join("Kirishot")
 }
 
-/// `%APPDATA%\Kirishot\captures`: originals and documents of the captures opened in the editor.
+/// `%APPDATA%\Kirishot\captures`: where J2 kept editor originals; moved into the history.
 pub fn captures_dir() -> PathBuf {
     app_root().join("captures")
+}
+
+/// `%APPDATA%\Kirishot\history`: one folder per capture and `index.json` (spec J3 § 4.2).
+pub fn history_dir() -> PathBuf {
+    app_root().join("history")
 }
 
 pub fn settings_file() -> PathBuf {

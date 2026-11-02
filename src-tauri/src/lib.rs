@@ -5,8 +5,6 @@ mod error;
 mod flow;
 mod frame;
 mod geometry;
-// Wired to the app in the next commit (J3 Task 5).
-#[allow(dead_code)]
 mod history;
 mod hotkeys;
 mod logging;
@@ -83,6 +81,12 @@ pub fn run() {
             }
             // A drag that never ends would freeze every window (drag-rs#94): cancel it after 30 s.
             drag::set_stuck_drag_timeout(Some(std::time::Duration::from_secs(30)));
+            // J2 kept editor originals in `captures\`: they join the history.
+            if let Err(e) = history::migrate_captures(&paths::captures_dir(), &paths::history_dir())
+            {
+                log::warn!("{e}");
+            }
+            app.manage(history::HistoryState::open(paths::history_dir()));
             // Thumbnail files from a previous run are never shown again.
             thumbnails::temp::clear(&paths::temp_dir());
             let shortcuts = loaded.settings.shortcuts.clone();
@@ -107,6 +111,14 @@ pub fn run() {
                 log::error!("{e}");
             }
             hotkeys::register_all(app.handle(), &shortcuts);
+            // Captures older than the retention leave the history at start, then every 24 h.
+            let sweeper = app.handle().clone();
+            std::thread::spawn(move || {
+                loop {
+                    history::sweep(&sweeper);
+                    std::thread::sleep(std::time::Duration::from_secs(24 * 60 * 60));
+                }
+            });
             if let Err(e) = tray::build(app.handle()) {
                 log::error!("{e}");
             }

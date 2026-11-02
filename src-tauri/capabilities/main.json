@@ -10,6 +10,13 @@
     "allow-settings-update",
     "allow-open-save-folder",
     "dialog:allow-open",
-    "allow-play-shutter-preview"
+    "allow-play-shutter-preview",
+    "allow-history-list",
+    "allow-history-thumb-path",
+    "allow-history-copy",
+    "allow-history-edit",
+    "allow-history-reveal",
+    "allow-history-delete",
+    "allow-history-clear"
   ]
 }

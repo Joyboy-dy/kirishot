@@ -119,6 +119,7 @@ fn preview_data_url(img: &RgbaImage) -> Option<String> {
 /// pushes its card. The file itself is written when the countdown ends.
 pub fn push(
     app: &tauri::AppHandle,
+    id: &str,
     img: RgbaImage,
     meta: CaptureMeta,
     monitor: &MonitorInfo,
@@ -129,7 +130,10 @@ pub fn push(
     let mut copied = false;
     if copies_now(action) {
         match output::copy_image(app, &img, &mut png) {
-            Ok(()) => copied = true,
+            Ok(()) => {
+                copied = true;
+                crate::history::mark_copied(app, id);
+            }
             Err(e) => notify::failure(app, &e),
         }
     }
@@ -137,7 +141,8 @@ pub fn push(
     let png = png.expect("encoded above");
     let preview_source = img.clone();
     let shots = app.state::<ShotStore>();
-    let id = shots.insert(img, meta, action);
+    shots.insert_with_id(id, img, meta, action);
+    let id = id.to_string();
     let (src, preview) = match temp::write_png(&paths::temp_dir(), &id, &png) {
         Ok(path) => {
             shots.set_temp_png(&id, path.clone());
@@ -218,6 +223,7 @@ fn save_now(app: &tauri::AppHandle, id: &str, image: &RgbaImage, meta: &CaptureM
                 notify::show(app, messages::FALLBACK_TITLE, messages::FALLBACK_BODY);
             }
             let path = saved.path.to_string_lossy().into_owned();
+            crate::history::mark_saved(app, id, &saved.path);
             app.state::<ThumbState>()
                 .saved
                 .lock()
@@ -250,7 +256,10 @@ pub fn copy(app: &tauri::AppHandle, id: &str) -> KResult<()> {
     let shot = shots.get(id).ok_or_else(shot_error)?;
     shots.expire(id);
     match output::copy_image(app, &shot.image, &mut None) {
-        Ok(()) => emit_update(app, id, ThumbStatus::Copied),
+        Ok(()) => {
+            crate::history::mark_copied(app, id);
+            emit_update(app, id, ThumbStatus::Copied)
+        }
         Err(e) => emit_update(
             app,
             id,
@@ -309,6 +318,8 @@ pub fn delete(app: &tauri::AppHandle, id: &str) {
     {
         log::warn!("cannot delete {}: {e}", saved.display());
     }
+    // « Supprimer » on the card discards the capture: it leaves the history too.
+    crate::history::delete(app, id);
     emit_update(app, id, ThumbStatus::Removed);
 }
 

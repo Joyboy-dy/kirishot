@@ -208,7 +208,7 @@ pub async fn editor_export(
 #[specta::specta]
 pub async fn editor_autosave(capture_id: String, document: String) -> KResult<()> {
     tauri::async_runtime::spawn_blocking(move || {
-        editor::write_document(&paths::captures_dir(), &capture_id, &document).map(|_| ())
+        editor::write_document(&paths::history_dir(), &capture_id, &document).map(|_| ())
     })
     .await
     .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))?
@@ -312,6 +312,112 @@ pub async fn open_save_folder(
         .map_err(|e| fail(&e))
 }
 
+/// Every capture of the history, newest first.
+#[tauri::command]
+#[specta::specta]
+pub async fn history_list(
+    app: tauri::AppHandle,
+) -> KResult<Vec<crate::history::index::HistoryEntry>> {
+    Ok(crate::history::entries(&app))
+}
+
+/// The thumbnail file of a capture, for `convertFileSrc`.
+#[tauri::command]
+#[specta::specta]
+pub async fn history_thumb_path(app: tauri::AppHandle, id: String) -> KResult<String> {
+    let path = crate::history::file(&app, &id, crate::history::index::THUMB_FILE)?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Copies a capture from the history: the annotated image if there is one.
+#[tauri::command]
+#[specta::specta]
+pub async fn history_copy(app: tauri::AppHandle, id: String) -> KResult<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use crate::history::index::{FINAL_FILE, ORIGINAL_FILE};
+        let final_path = crate::history::file(&app, &id, FINAL_FILE)?;
+        let path = if final_path.exists() {
+            final_path
+        } else {
+            crate::history::file(&app, &id, ORIGINAL_FILE)?
+        };
+        let png =
+            std::fs::read(&path).map_err(|e| KirishotError::new(ErrorCode::Save, e.to_string()))?;
+        let img = image::load_from_memory(&png)
+            .map_err(|e| KirishotError::new(ErrorCode::Encode, e.to_string()))?
+            .to_rgba8();
+        crate::output::copy_image(&app, &img, &mut Some(png))?;
+        crate::history::mark_copied(&app, &id);
+        Ok(())
+    })
+    .await
+    .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))?
+}
+
+/// Reopens a capture of the history in the editor, with its annotations.
+#[tauri::command]
+#[specta::specta]
+pub async fn history_edit(app: tauri::AppHandle, id: String) -> KResult<()> {
+    let shots = app.state::<crate::shots::ShotStore>();
+    if shots.get(&id).is_none() {
+        let entry = crate::history::entry(&app, &id)?;
+        let path = crate::history::file(&app, &id, crate::history::index::ORIGINAL_FILE)?;
+        let img = image::open(&path)
+            .map_err(|e| KirishotError::new(ErrorCode::Encode, e.to_string()))?
+            .to_rgba8();
+        let taken_at = chrono::DateTime::parse_from_rfc3339(&entry.created_at)
+            .map(|t| t.with_timezone(&chrono::Local))
+            .unwrap_or_else(|_| chrono::Local::now());
+        let meta = crate::output::CaptureMeta {
+            taken_at,
+            window_title: entry.source.window_title.clone(),
+        };
+        let action = app.state::<SettingsState>().get().after_capture.auto_action;
+        shots.insert_with_id(&id, img, meta, action);
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(editor::open(&handle, &id));
+    })
+    .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?;
+    rx.recv()
+        .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?
+}
+
+/// The Explorer with the file the capture was last saved to.
+#[tauri::command]
+#[specta::specta]
+pub async fn history_reveal(app: tauri::AppHandle, id: String) -> KResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let entry = crate::history::entry(&app, &id)?;
+    let path = entry
+        .saved_path
+        .filter(|p| std::path::Path::new(p).exists())
+        .ok_or_else(|| {
+            KirishotError::new(ErrorCode::Save, "Le fichier enregistré n'existe plus")
+        })?;
+    app.opener()
+        .reveal_item_in_dir(path)
+        .map_err(|e| KirishotError::new(ErrorCode::Save, e.to_string()))
+}
+
+/// Removes a capture from the history (never the file it was saved to).
+#[tauri::command]
+#[specta::specta]
+pub async fn history_delete(app: tauri::AppHandle, id: String) -> KResult<()> {
+    crate::history::delete(&app, &id);
+    Ok(())
+}
+
+/// Empties the history (never the saved files).
+#[tauri::command]
+#[specta::specta]
+pub async fn history_clear(app: tauri::AppHandle) -> KResult<()> {
+    crate::history::clear(&app);
+    Ok(())
+}
+
 /// Every command and event exposed to the front end.
 pub fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
@@ -341,14 +447,22 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             editor_loaded,
             editor_close,
             editor_autosave,
-            play_shutter_preview
+            play_shutter_preview,
+            history_list,
+            history_thumb_path,
+            history_copy,
+            history_edit,
+            history_reveal,
+            history_delete,
+            history_clear
         ])
         .events(collect_events![
             SettingsChanged,
             OverlayClaimed,
             OverlayReset,
             ThumbnailPushed,
-            ThumbnailUpdate
+            ThumbnailUpdate,
+            crate::history::HistoryChanged
         ])
         // Used by the overlay before any command carries them.
         .typ::<Rect>()

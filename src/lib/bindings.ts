@@ -44,10 +44,25 @@ export const commands = {
 	editorAutosave: (captureId: string, document: string) => typedError<null, KirishotError>(__TAURI_INVOKE("editor_autosave", { captureId, document })),
 	/**  Plays the shutter click, so the settings page can preview it. */
 	playShutterPreview: () => typedError<null, KirishotError>(__TAURI_INVOKE("play_shutter_preview")),
+	/**  Every capture of the history, newest first. */
+	historyList: () => typedError<HistoryEntry[], KirishotError>(__TAURI_INVOKE("history_list")),
+	/**  The thumbnail file of a capture, for `convertFileSrc`. */
+	historyThumbPath: (id: string) => typedError<string, KirishotError>(__TAURI_INVOKE("history_thumb_path", { id })),
+	/**  Copies a capture from the history: the annotated image if there is one. */
+	historyCopy: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("history_copy", { id })),
+	/**  Reopens a capture of the history in the editor, with its annotations. */
+	historyEdit: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("history_edit", { id })),
+	/**  The Explorer with the file the capture was last saved to. */
+	historyReveal: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("history_reveal", { id })),
+	/**  Removes a capture from the history (never the file it was saved to). */
+	historyDelete: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("history_delete", { id })),
+	/**  Empties the history (never the saved files). */
+	historyClear: () => typedError<null, KirishotError>(__TAURI_INVOKE("history_clear")),
 };
 
 /** Events */
 export const events = {
+	historyChanged: makeEvent<HistoryChanged, HistoryChanged>("history-changed"),
 	overlayClaimed: makeEvent<OverlayClaimed, OverlayClaimed>("overlay-claimed"),
 	overlayReset: makeEvent<OverlayReset, OverlayReset>("overlay-reset"),
 	settingsChanged: makeEvent<SettingsChanged, SettingsChanged>("settings-changed"),
@@ -123,12 +138,35 @@ export type ExportResult = {
 /**  Destination folder chosen in the settings page. */
 export type FolderChoice = { kind: "default" } | { kind: "custom"; path: string };
 
+/**  Sent when the history changes, so the main window can list it again. */
+export type HistoryChanged = null;
+
+/**  One capture in the history (spec v1 § 6.3). */
+export type HistoryEntry = {
+	id: string,
+	/**  RFC 3339, local time. */
+	createdAt: string,
+	size: ImageSize,
+	source: Source,
+	/**  The last file it was saved to, if any. */
+	savedPath: string | null,
+	copied: boolean,
+	annotated: boolean,
+	/**  Bytes used in the history folder. */
+	bytes: number | null,
+};
+
 export type HistorySettings = {
 	/**  `None` keeps captures forever. */
 	retentionDays: number | null,
 };
 
 export type ImageFormat = "png" | "jpg" | "webp";
+
+export type ImageSize = {
+	w: number,
+	h: number,
+};
 
 /**  The only error type that crosses the IPC boundary. */
 export type KirishotError = {
@@ -257,6 +295,13 @@ export type Shortcuts = {
 	repeatRegion: string | null,
 	openHistory: string | null,
 };
+
+export type Source = {
+	kind: SourceKind,
+	windowTitle: string | null,
+};
+
+export type SourceKind = "region" | "window" | "fullscreen";
 
 export type StartModeSetting = "region" | "window" | 
 /**  The mode chosen last (`capture.mode`). */
