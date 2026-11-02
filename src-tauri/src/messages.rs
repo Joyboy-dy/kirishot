@@ -27,3 +27,7 @@ pub const TRAY_QUIT: &str = "Quitter";
 
 /// Where the source code lives (« À propos »).
 pub const REPOSITORY_URL: &str = "https://github.com/Joyboy-dy/kirishot";
+
+pub const SHORTCUT_TAKEN: &str = "Déjà utilisé par une autre application";
+pub const SHORTCUT_DUPLICATE: &str = "Déjà utilisé par un autre raccourci de Kirishot";
+pub const SHORTCUT_UNPARSABLE: &str = "Combinaison non reconnue";

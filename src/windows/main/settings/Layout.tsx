@@ -17,7 +17,13 @@ export function Section(props: { title: string; children: ReactNode }) {
   );
 }
 
-export function Row(props: { label: string; hint?: string; children: ReactNode }) {
+export function Row(props: {
+  label: string;
+  hint?: string;
+  /** The hint is an error message. */
+  error?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div
       className="flex items-center justify-between gap-6 px-5 py-4"
@@ -26,7 +32,10 @@ export function Row(props: { label: string; hint?: string; children: ReactNode }
       <div className="flex flex-col gap-1">
         <span className="text-[14px] font-medium">{props.label}</span>
         {props.hint && (
-          <span className="text-[12.5px]" style={{ color: 'var(--k-text-3)' }}>
+          <span
+            className="text-[12.5px]"
+            style={{ color: props.error ? 'var(--k-danger)' : 'var(--k-text-3)' }}
+          >
             {props.hint}
           </span>
         )}

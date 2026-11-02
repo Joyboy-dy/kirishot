@@ -478,6 +478,54 @@ pub async fn open_repository(app: tauri::AppHandle) -> KResult<()> {
         .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))
 }
 
+/// Changes a global shortcut, or removes it with `null` (spec J3 § 4.3).
+#[tauri::command]
+#[specta::specta]
+pub async fn shortcut_set(
+    app: tauri::AppHandle,
+    slot: crate::hotkeys::BindingSlot,
+    accel: Option<String>,
+) -> KResult<SettingsView> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    // The shortcut plugin registers on the main thread.
+    app.run_on_main_thread(move || {
+        let _ = tx.send(crate::hotkeys::set_binding(&handle, slot, accel));
+    })
+    .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?;
+    rx.recv()
+        .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))??;
+    let next = app.state::<SettingsState>().get();
+    let view = settings_view(&app, &next)?;
+    if let Err(e) = SettingsChanged(view.clone()).emit(&app) {
+        log::warn!("cannot emit settings-changed: {e}");
+    }
+    Ok(view)
+}
+
+/// Starts (or stops) waiting for a new combination on the Raccourcis page; the result comes as
+/// the `shortcut-recorded` event.
+#[tauri::command]
+#[specta::specta]
+pub async fn shortcut_record(app: tauri::AppHandle, on: bool) -> KResult<()> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        crate::hotkeys::record(&handle, on);
+        let _ = tx.send(());
+    })
+    .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?;
+    rx.recv()
+        .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))
+}
+
+/// The default combination of a global shortcut, for « Par défaut ».
+#[tauri::command]
+#[specta::specta]
+pub async fn shortcut_default(slot: crate::hotkeys::BindingSlot) -> KResult<Option<String>> {
+    Ok(crate::hotkeys::default_binding(slot))
+}
+
 /// Every capture of the history, newest first.
 #[tauri::command]
 #[specta::specta]
@@ -619,6 +667,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             editor_cancel_next,
             editor_rename,
             start_capture,
+            shortcut_set,
+            shortcut_default,
+            shortcut_record,
             open_logs_folder,
             open_repository,
             history_list,
@@ -636,7 +687,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             ThumbnailPushed,
             ThumbnailUpdate,
             crate::history::HistoryChanged,
-            editor::EditorCloseRequested
+            editor::EditorCloseRequested,
+            crate::hotkeys::ShortcutRecorded
         ])
         // Used by the overlay before any command carries them.
         .typ::<Rect>()

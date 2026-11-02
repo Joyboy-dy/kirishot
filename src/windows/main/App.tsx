@@ -3,6 +3,7 @@ import { t } from '@/i18n';
 import { AboutPage } from './about/AboutPage';
 import { HistoryPage } from './history/HistoryPage';
 import { Page } from './Page';
+import { ShortcutsPage } from './shortcuts/ShortcutsPage';
 import { DEFAULT_ROUTE, type Route } from './routes';
 import { CaptureSettings } from './settings/CaptureSettings';
 import { GeneralSettings } from './settings/GeneralSettings';
@@ -19,7 +20,7 @@ export function App() {
       <Sidebar route={route} onRoute={setRoute} />
       {route === 'about' && <AboutPage />}
       {route === 'history' && <HistoryPage />}
-      {route === 'shortcuts' && <Page title={t('main.shortcuts')}>{null}</Page>}
+      {route === 'shortcuts' && <ShortcutsPage />}
       {route === 'settings' && (
         <Page title={t('main.settings')}>
           <GeneralSettings />

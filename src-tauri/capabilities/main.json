@@ -20,6 +20,9 @@
     "allow-history-clear",
     "allow-start-capture",
     "allow-open-logs-folder",
-    "allow-open-repository"
+    "allow-open-repository",
+    "allow-shortcut-set",
+    "allow-shortcut-default",
+    "allow-shortcut-record"
   ]
 }

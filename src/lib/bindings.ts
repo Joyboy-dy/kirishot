@@ -60,6 +60,15 @@ export const commands = {
 	 *  as with the shortcut (the frozen screen must not show Kirishot itself).
 	 */
 	startCapture: () => typedError<null, KirishotError>(__TAURI_INVOKE("start_capture")),
+	/**  Changes a global shortcut, or removes it with `null` (spec J3 § 4.3). */
+	shortcutSet: (slot: BindingSlot, accel: string | null) => typedError<SettingsView, KirishotError>(__TAURI_INVOKE("shortcut_set", { slot, accel })),
+	/**  The default combination of a global shortcut, for « Par défaut ». */
+	shortcutDefault: (slot: BindingSlot) => typedError<string | null, KirishotError>(__TAURI_INVOKE("shortcut_default", { slot })),
+	/**
+	 *  Starts (or stops) waiting for a new combination on the Raccourcis page; the result comes as
+	 *  the `shortcut-recorded` event.
+	 */
+	shortcutRecord: (on: boolean) => typedError<null, KirishotError>(__TAURI_INVOKE("shortcut_record", { on })),
 	/**  The folder of the log files, in the Explorer (« À propos »). */
 	openLogsFolder: () => typedError<null, KirishotError>(__TAURI_INVOKE("open_logs_folder")),
 	/**  Kirishot's repository, in the browser (« À propos »). */
@@ -87,6 +96,7 @@ export const events = {
 	overlayClaimed: makeEvent<OverlayClaimed, OverlayClaimed>("overlay-claimed"),
 	overlayReset: makeEvent<OverlayReset, OverlayReset>("overlay-reset"),
 	settingsChanged: makeEvent<SettingsChanged, SettingsChanged>("settings-changed"),
+	shortcutRecorded: makeEvent<ShortcutRecorded, ShortcutRecorded>("shortcut-recorded"),
 	thumbnailPushed: makeEvent<ThumbnailPushed, ThumbnailPushed>("thumbnail-pushed"),
 	thumbnailUpdate: makeEvent<ThumbnailUpdate, ThumbnailUpdate>("thumbnail-update"),
 };
@@ -106,6 +116,9 @@ export type AppInfo = {
 };
 
 export type AutoAction = "saveAndCopy" | "copy" | "save";
+
+/**  The global shortcuts the Raccourcis page can change (spec J3 § 4.3). */
+export type BindingSlot = "region" | "regionAlt" | "fullscreen";
 
 export type CaptureMode = "region" | "window";
 
@@ -320,6 +333,11 @@ export type SettingsView = {
 	settings: Settings,
 	saveFolder: string,
 	saveFolderDisplay: string,
+};
+
+/**  The combination recorded for the Raccourcis page; `None` when cancelled with Échap. */
+export type ShortcutRecorded = {
+	accel: string | null,
 };
 
 export type Shortcuts = {
