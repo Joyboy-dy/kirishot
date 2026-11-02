@@ -12,6 +12,7 @@ import { cssToPhysical, isTooSmall, type Point } from '@/lib/geometry';
 import { NO_CHANGE } from '@/lib/settings';
 import { t } from '@/i18n';
 import { commands, type CommitTarget, type OverlaySession, type Rect } from '@/lib/ipc';
+import { flashPlan, flashRect, FLASH_MS } from './flash';
 import { KeyHints } from './KeyHints';
 import { Magnifier } from './Magnifier';
 import { SelectionLayer } from './SelectionLayer';
@@ -60,6 +61,7 @@ export function Overlay() {
   const [active, setActive] = useState(false);
   const [magnifier, setMagnifier] = useState(true);
   const [copiedHex, setCopiedHex] = useState<string | null>(null);
+  const [flash, setFlash] = useState<Rect | null>(null);
   const [space, setSpace] = useState(false);
   const spaceRef = useRef(false);
 
@@ -101,11 +103,22 @@ export function Overlay() {
     if (!s) return;
     if (outcome.type === 'claim') report(commands.overlayClaim());
     if (outcome.type === 'cancel') report(commands.overlayCancel());
-    if (outcome.type === 'commit')
-      report(commands.overlayCommit(s.captureId, outcome.target, outcome.copyOnly ?? false));
+    if (outcome.type === 'commit') commitWithFlash(s, outcome.target, outcome.copyOnly ?? false);
     if (outcome.type === 'mode') setMode(outcome.mode);
-    if (outcome.type === 'fullscreen')
-      report(commands.overlayCommit(s.captureId, { kind: 'monitor' }, false));
+    if (outcome.type === 'fullscreen') commitWithFlash(s, { kind: 'monitor' }, false);
+  };
+
+  // The flash plays over the zone first; Rust closes the overlays once it is over.
+  const commitWithFlash = (s: OverlaySession, target: CommitTarget, copyOnly: boolean) => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const { duration } = flashPlan(reduced, s.flash);
+    const send = () => report(commands.overlayCommit(s.captureId, target, copyOnly));
+    if (duration === 0) return send();
+    setFlash(flashRect(target, s));
+    window.setTimeout(() => {
+      setFlash(null);
+      send();
+    }, duration);
   };
 
   const toggleMagnifier = (on: boolean) => {
@@ -266,6 +279,19 @@ export function Overlay() {
           />
           {showMagnifier && (
             <Magnifier source={canvasRef} frame={frame} at={pointer} scale={scale} />
+          )}
+          {flash && (
+            <div
+              className="pointer-events-none absolute"
+              style={{
+                left: flash.x / scale,
+                top: flash.y / scale,
+                width: flash.width / scale,
+                height: flash.height / scale,
+                background: '#fff',
+                animation: `k-flash ${FLASH_MS}ms ease-out forwards`,
+              }}
+            />
           )}
           {copiedHex && pointer && (
             <div

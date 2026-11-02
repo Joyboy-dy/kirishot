@@ -112,6 +112,8 @@ export type OverlaySession = {
 	commitOnRelease: boolean,
 	/**  Whether the magnifier starts shown (the overlay toggles it with M). */
 	magnifier: boolean,
+	/**  Whether the zone flashes when it is captured. */
+	flash: boolean,
 };
 
 export type Point = {

@@ -11,6 +11,7 @@ mod notify;
 mod output;
 mod paths;
 mod settings;
+mod sound;
 mod store;
 mod tray;
 mod windowing;

@@ -31,6 +31,8 @@ pub struct OverlaySession {
     pub commit_on_release: bool,
     /// Whether the magnifier starts shown (the overlay toggles it with M).
     pub magnifier: bool,
+    /// Whether the zone flashes when it is captured.
+    pub flash: bool,
 }
 
 /// Tells the other overlays to drop their selection: a selection stays on one monitor.
@@ -167,6 +169,7 @@ fn start_region(app: &tauri::AppHandle) -> KResult<()> {
                 }),
                 commit_on_release: settings.capture.commit_on_release,
                 magnifier: settings.capture.magnifier,
+                flash: settings.capture.flash,
             };
             let json = serde_json::to_string(&overlay).expect("session always serializes");
             (i, frame::encode_frame(&shot.image), json)
@@ -205,6 +208,7 @@ fn watch_reveal(app: &tauri::AppHandle, id: String) {
 
 fn run_fullscreen(app: &tauri::AppHandle) -> KResult<()> {
     let session = capture::capture_all()?;
+    crate::sound::play_shutter(app);
     let monitors: Vec<MonitorInfo> = session.monitors.iter().map(|s| s.info.clone()).collect();
     let index = cursor(app)
         .and_then(|c| monitor_at_point(&monitors, c))
@@ -278,6 +282,7 @@ pub fn commit(
     if flow.active_capture().as_deref() != Some(capture_id) {
         return Err(no_capture());
     }
+    crate::sound::play_shutter(app);
     let store = app.state::<CaptureStore>();
     let session = store.get(capture_id).ok_or_else(no_capture)?;
     let shot = session

@@ -109,6 +109,19 @@ body {
   }
 }
 
+/* The capture flash: up to 30 % white and back. */
+@keyframes k-flash {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* A pressed control sinks slightly. */
 .k-press {
   transition:
