@@ -191,6 +191,17 @@ pub async fn editor_export(
         .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))?
 }
 
+/// Saves the editor's document (JSON) beside the original.
+#[tauri::command]
+#[specta::specta]
+pub async fn editor_autosave(capture_id: String, document: String) -> KResult<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        editor::write_document(&paths::captures_dir(), &capture_id, &document).map(|_| ())
+    })
+    .await
+    .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))?
+}
+
 /// Closes the editor and frees its capture.
 #[tauri::command]
 #[specta::specta]
@@ -308,7 +319,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             thumbnail_reveal,
             thumbnail_copy_path,
             editor_loaded,
-            editor_close
+            editor_close,
+            editor_autosave
         ])
         .events(collect_events![
             SettingsChanged,

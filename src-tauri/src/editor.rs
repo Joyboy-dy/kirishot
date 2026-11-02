@@ -107,6 +107,16 @@ pub fn open(app: &tauri::AppHandle, id: &str) -> KResult<()> {
             format!("Capture trop grande pour l'éditeur ({width} × {height})"),
         ));
     }
+    // The original is kept beside the document, written off the main thread.
+    let original = shot.image.clone();
+    let original_id = id.to_string();
+    std::thread::spawn(move || {
+        let written = crate::output::encode_png(&original)
+            .and_then(|png| write_original(&crate::paths::captures_dir(), &original_id, &png));
+        if let Err(e) = written {
+            log::warn!("cannot keep the original of {original_id}: {e}");
+        }
+    });
     let title = editor_title(shot.meta.taken_at.naive_local());
     let session = EditorSession {
         capture_id: id.to_string(),
@@ -290,6 +300,46 @@ fn save_as(
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
+/// Writes `captures/<id>/document.json` atomically; `id` must be a ULID (no path tricks).
+pub fn write_document(root: &std::path::Path, id: &str, json: &str) -> KResult<std::path::PathBuf> {
+    write_atomic(&capture_dir(root, id)?, "document.json", json.as_bytes())
+}
+
+/// Writes `captures/<id>/original.png`, the capture before any annotation.
+pub fn write_original(root: &std::path::Path, id: &str, png: &[u8]) -> KResult<std::path::PathBuf> {
+    write_atomic(&capture_dir(root, id)?, "original.png", png)
+}
+
+fn capture_dir(root: &std::path::Path, id: &str) -> KResult<std::path::PathBuf> {
+    if ulid::Ulid::from_string(id).is_err() {
+        return Err(KirishotError::new(
+            ErrorCode::InvalidSelection,
+            "Identifiant de capture invalide",
+        ));
+    }
+    Ok(root.join(id))
+}
+
+/// A temporary file then a rename: a crash never leaves a half-written file.
+fn write_atomic(dir: &std::path::Path, name: &str, bytes: &[u8]) -> KResult<std::path::PathBuf> {
+    let fail = |e: std::io::Error| {
+        KirishotError::new(
+            ErrorCode::Save,
+            format!("Sauvegarde de l'éditeur impossible : {e}"),
+        )
+    };
+    std::fs::create_dir_all(dir).map_err(fail)?;
+    let path = dir.join(name);
+    let tmp = dir.join(format!(".{name}.tmp"));
+    std::fs::write(&tmp, bytes)
+        .and_then(|_| std::fs::rename(&tmp, &path))
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
+            fail(e)
+        })?;
+    Ok(path)
+}
+
 /// What the editor asks for with its exported image.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExportIntent {
@@ -347,5 +397,21 @@ mod tests {
     fn parse_intent_rejects_missing_or_unknown() {
         assert!(parse_intent(None).is_err());
         assert!(parse_intent(Some("print")).is_err());
+    }
+
+    #[test]
+    fn autosave_is_atomic_and_rejects_bad_ids() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(write_document(dir.path(), "../x", "{}").is_err());
+        assert!(write_document(dir.path(), "01JBX4", "{}").is_err());
+        let id = ulid::Ulid::generate().to_string();
+        let path = write_document(dir.path(), &id, r#"{"version":1}"#).unwrap();
+        assert_eq!(path, dir.path().join(&id).join("document.json"));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), r#"{"version":1}"#);
+        let leftovers = std::fs::read_dir(dir.path().join(&id))
+            .unwrap()
+            .filter(|e| e.as_ref().unwrap().file_name() != "document.json")
+            .count();
+        assert_eq!(leftovers, 0);
     }
 }

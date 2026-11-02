@@ -40,6 +40,8 @@ export const commands = {
 	editorLoaded: () => typedError<null, KirishotError>(__TAURI_INVOKE("editor_loaded")),
 	/**  Closes the editor and frees its capture. */
 	editorClose: () => typedError<null, KirishotError>(__TAURI_INVOKE("editor_close")),
+	/**  Saves the editor's document (JSON) beside the original. */
+	editorAutosave: (captureId: string, document: string) => typedError<null, KirishotError>(__TAURI_INVOKE("editor_autosave", { captureId, document })),
 };
 
 /** Events */

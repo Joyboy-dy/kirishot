@@ -9,6 +9,7 @@
     "allow-editor-close",
     "allow-copy-text",
     "allow-editor-export",
-    "allow-open-save-folder"
+    "allow-open-save-folder",
+    "allow-editor-autosave"
   ]
 }

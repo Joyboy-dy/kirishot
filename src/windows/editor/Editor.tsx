@@ -20,6 +20,7 @@ import { PALETTE, strokeWidth } from '@/editor/style';
 import { commands } from '@/lib/ipc';
 import { t } from '@/i18n';
 import { Canvas, type CanvasPointer } from './Canvas';
+import { useAutosave } from './autosave';
 import { ContextBubble } from './ContextBubble';
 import { exportImage, type ExportIntent } from './export';
 import { keyAction, type EditorAction } from './keys';
@@ -141,6 +142,7 @@ export function Editor() {
   }, []);
 
   const doc = history?.present ?? null;
+  useAutosave(doc);
   const image = doc ? doc.size : { w: 1, h: 1 };
   const record = (next: Doc) => setHistory((h) => h && commit(h, next));
   const fitView = () => {

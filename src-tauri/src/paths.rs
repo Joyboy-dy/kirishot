@@ -26,6 +26,11 @@ pub fn temp_dir() -> PathBuf {
     std::env::temp_dir().join("Kirishot")
 }
 
+/// `%APPDATA%\Kirishot\captures`: originals and documents of the captures opened in the editor.
+pub fn captures_dir() -> PathBuf {
+    app_root().join("captures")
+}
+
 pub fn settings_file() -> PathBuf {
     app_root().join("settings.json")
 }
