@@ -27,45 +27,28 @@ export function snapAngle(from: Point, to: Point, stepDeg = 15): Point {
 }
 
 /**
- * The filled outline of a tapered arrow: a body from 0.35 × `width` at the tail to `width`, and
- * a solid head of length max(3.2 × width, 10) and half-width 1.6 × width, along the tangent at
- * the tip. Empty when the arrow has no length.
+ * An arrow in two parts (spec J2.1 § 3.2): the shaft, a centre line from the tail to the head's
+ * base that is stroked (so it can be dashed), and the solid head, `[barb, tip, barb]`, of length
+ * max(3.2 × width, 10) and half-width 1.6 × width along the tangent at the tip. Both are empty
+ * when the arrow has no length.
  */
-export function arrowOutline(
+export function arrowParts(
   from: Point,
   to: Point,
   control: Point | null,
   width: number,
-): Point[] {
+): { shaft: Point[]; head: Point[] } {
   const d = unit(sub(to, control ?? from));
-  if (!d) return [];
+  if (!d) return { shaft: [], head: [] };
   const headLength = Math.max(3.2 * width, 10);
   const headHalf = 1.6 * width;
   const base = sub(to, mul(d, headLength));
   const n = normal(d);
 
-  // The body's centre line, from the tail to the head's base.
-  let spine: Point[] = [from, base];
+  let shaft: Point[] = [from, base];
   if (control) {
     const samples = Array.from({ length: 25 }, (_, i) => quadPoint(from, control, to, i / 24));
-    spine = [...samples.filter((p) => Math.hypot(p.x - to.x, p.y - to.y) > headLength), base];
+    shaft = [...samples.filter((p) => Math.hypot(p.x - to.x, p.y - to.y) > headLength), base];
   }
-  const half = (i: number) => {
-    const f = spine.length < 2 ? 1 : i / (spine.length - 1);
-    return width * (0.175 + (0.5 - 0.175) * f);
-  };
-  const normalAt = (i: number) => {
-    if (i === spine.length - 1) return n;
-    const local = unit(sub(spine[i + 1], spine[i]));
-    return local ? normal(local) : n;
-  };
-  const left = spine.map((p, i) => add(p, mul(normalAt(i), half(i))));
-  const right = spine.map((p, i) => sub(p, mul(normalAt(i), half(i))));
-  return [
-    ...left,
-    add(base, mul(n, headHalf)),
-    to,
-    sub(base, mul(n, headHalf)),
-    ...right.reverse(),
-  ];
+  return { shaft, head: [add(base, mul(n, headHalf)), to, sub(base, mul(n, headHalf))] };
 }

@@ -13,9 +13,10 @@ import {
   Text,
 } from 'react-konva';
 import { getStroke } from 'perfect-freehand';
-import { stepNumber, type Annotation, type Doc, type Point, type Stroke } from '@/editor/document';
-import { arrowOutline } from '@/editor/geometry';
+import { stepNumber, type Annotation, type Doc, type Point } from '@/editor/document';
+import { arrowParts } from '@/editor/geometry';
 import { pixelateBlocks } from '@/editor/pixelate';
+import { dashFor } from './dash';
 
 export type NodeEvents = {
   draggable: boolean;
@@ -25,11 +26,6 @@ export type NodeEvents = {
 };
 
 const SHADOW = { shadowColor: 'black', shadowBlur: 6, shadowOffsetY: 2, shadowOpacity: 0.35 };
-const DASH: Record<Stroke['dash'], (w: number) => number[] | undefined> = {
-  solid: () => undefined,
-  dashed: (w) => [w * 3, w * 2],
-  dotted: (w) => [0.01, w * 2],
-};
 
 function fillPath(ctx: Konva.Context, pts: number[][] | Point[]) {
   ctx.beginPath();
@@ -53,7 +49,7 @@ function Pixelated({
 }) {
   const { x, y, width, height } = a.box;
   const canvas = useMemo(() => {
-    const out = pixelateBlocks(pixels, { x, y, width, height }, 16, a.id.charCodeAt(0) * 7919);
+    const out = pixelateBlocks(pixels, { x, y, width, height }, a.block, a.id.charCodeAt(0) * 7919);
     const c = document.createElement('canvas');
     c.width = Math.max(1, out.width);
     c.height = Math.max(1, out.height);
@@ -64,7 +60,7 @@ function Pixelated({
         0,
       );
     return c;
-  }, [pixels, x, y, width, height, a.id]);
+  }, [pixels, x, y, width, height, a.block, a.id]);
   return (
     <KImage
       {...common}
@@ -115,23 +111,44 @@ export function AnnotationNode({
 
   switch (a.tool) {
     case 'arrow': {
+      // A stroked shaft (dashes and dots apply) under a solid head, both with a white edge.
       const [from, to] = a.points;
-      const outline = arrowOutline(from, to, a.control, a.stroke.width);
+      const { shaft, head } = arrowParts(from, to, a.control, a.stroke.width);
+      const w = a.stroke.width;
+      const edge = Math.max(1, w * 0.25);
+      const line = shaft.flatMap((p) => [p.x, p.y]);
+      const dash = dashFor(a.stroke.dash, w);
       return (
-        <Shape
-          {...common}
-          baseX={0}
-          baseY={0}
-          fill={a.stroke.color}
-          stroke="white"
-          strokeWidth={Math.max(1, a.stroke.width * 0.5)}
-          opacity={a.stroke.opacity}
-          {...(a.shadow ? SHADOW : {})}
-          sceneFunc={(ctx, shape) => {
-            fillPath(ctx, outline);
-            ctx.fillStrokeShape(shape);
-          }}
-        />
+        <Group {...common} baseX={0} baseY={0} opacity={a.stroke.opacity}>
+          <Line
+            points={line}
+            stroke="white"
+            strokeWidth={w + 2 * edge}
+            lineCap="round"
+            lineJoin="round"
+            dash={dash}
+            hitStrokeWidth={14}
+            {...(a.shadow ? SHADOW : {})}
+          />
+          <Line
+            points={line}
+            stroke={a.stroke.color}
+            strokeWidth={w}
+            lineCap="round"
+            lineJoin="round"
+            dash={dash}
+            hitStrokeWidth={14}
+          />
+          <Line
+            points={head.flatMap((p) => [p.x, p.y])}
+            closed
+            fill={a.stroke.color}
+            stroke="white"
+            strokeWidth={edge * 2}
+            lineJoin="round"
+            {...(a.shadow ? SHADOW : {})}
+          />
+        </Group>
       );
     }
     case 'line':
@@ -144,8 +161,9 @@ export function AnnotationNode({
           stroke={a.stroke.color}
           strokeWidth={a.stroke.width}
           opacity={a.stroke.opacity}
-          dash={DASH[a.stroke.dash](a.stroke.width)}
+          dash={dashFor(a.stroke.dash, a.stroke.width)}
           lineCap="round"
+          {...(a.shadow ? SHADOW : {})}
         />
       );
     case 'rect':
@@ -160,7 +178,8 @@ export function AnnotationNode({
         stroke: a.stroke.color,
         strokeWidth: a.stroke.width,
         opacity: a.stroke.opacity,
-        dash: DASH[a.stroke.dash](a.stroke.width),
+        dash: dashFor(a.stroke.dash, a.stroke.width),
+        lineCap: 'round' as const,
         fill,
         ...(a.shadow ? SHADOW : {}),
       };
@@ -212,7 +231,7 @@ export function AnnotationNode({
           baseX={0}
           baseY={0}
           fill={isPen ? a.stroke.color : a.color}
-          opacity={isPen ? a.stroke.opacity : 1}
+          opacity={isPen ? a.stroke.opacity : a.opacity}
           globalCompositeOperation={isPen ? 'source-over' : 'multiply'}
           sceneFunc={(ctx, shape) => {
             fillPath(ctx, outline);

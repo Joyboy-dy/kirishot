@@ -56,7 +56,7 @@ export function begin(tool: ToolId, at: Point, style: Style, image: Image): Anno
     case 'arrow':
       return { id, tool, points: [at, at], control: null, stroke, shadow: style.shadow };
     case 'line':
-      return { id, tool, points: [at, at], stroke };
+      return { id, tool, points: [at, at], stroke, shadow: style.shadow };
     case 'rect':
     case 'ellipse':
       return { id, tool, box: zero, stroke, fill, shadow: style.shadow };

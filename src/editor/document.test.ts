@@ -95,6 +95,20 @@ describe('normalizeDoc', () => {
     expect(doc.annotations[1]).toMatchObject({ tool: 'pixelate', block: 16 });
   });
 
+  it('gives old lines no shadow', () => {
+    const line = {
+      id: 'l',
+      tool: 'line',
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
+      ],
+      stroke: { color: '#f00', width: 2, opacity: 1, dash: 'solid' },
+    };
+    const doc = normalizeDoc({ ...empty, annotations: [line] } as unknown as Doc);
+    expect(doc.annotations[0]).toMatchObject({ tool: 'line', shadow: false });
+  });
+
   it('keeps values already set', () => {
     const doc = {
       ...empty,

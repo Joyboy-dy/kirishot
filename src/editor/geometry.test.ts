@@ -1,34 +1,40 @@
 import { describe, expect, it } from 'vitest';
-import { arrowOutline, quadPoint, snapAngle } from './geometry';
+import { arrowParts, quadPoint, snapAngle } from './geometry';
 
 const near = (p: { x: number; y: number }, x: number, y: number) =>
   Math.abs(p.x - x) < 1e-6 && Math.abs(p.y - y) < 1e-6;
 
-describe('arrowOutline', () => {
-  it('straight arrow: tip at the end, head as wide as 1.6 × width', () => {
-    const o = arrowOutline({ x: 0, y: 0 }, { x: 100, y: 0 }, null, 4);
-    expect(Math.max(...o.map((p) => p.x))).toBeCloseTo(100);
-    expect(o.every((p) => Math.abs(p.y) <= 1.6 * 4 + 1e-9)).toBe(true);
-    expect(o.some((p) => near(p, 100 - 12.8, 6.4))).toBe(true);
+describe('arrowParts', () => {
+  it('straight arrow: tip at the end, barbs behind it, 1.6 × width from the axis', () => {
+    const { head } = arrowParts({ x: 0, y: 0 }, { x: 100, y: 0 }, null, 4);
+    expect(near(head[1], 100, 0)).toBe(true);
+    expect(near(head[0], 100 - 12.8, 6.4) || near(head[0], 100 - 12.8, -6.4)).toBe(true);
+    expect(head[0].x).toBeLessThan(100);
+    expect(head[2].x).toBeLessThan(100);
   });
 
-  it('the tail is thinner than the body', () => {
-    const o = arrowOutline({ x: 0, y: 0 }, { x: 100, y: 0 }, null, 4);
-    const tail = o.filter((p) => Math.abs(p.x) < 1e-9).map((p) => Math.abs(p.y));
-    expect(Math.max(...tail)).toBeCloseTo(0.175 * 4);
+  it('the shaft starts at the tail and ends where the head starts', () => {
+    const { shaft, head } = arrowParts({ x: 0, y: 0 }, { x: 100, y: 0 }, null, 4);
+    expect(shaft[0]).toEqual({ x: 0, y: 0 });
+    expect(Math.abs(shaft[shaft.length - 1].x - head[0].x)).toBeLessThan(0.5);
   });
 
-  it('curved arrow: the head follows the tangent at the tip', () => {
+  it('curved arrow: the shaft follows the curve and the head the tangent at the tip', () => {
     // Tangent at the tip: to − control = (0, 100), pointing down; the barbs sit above the tip.
-    const o = arrowOutline({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: -100 }, 4);
-    expect(o.some((p) => near(p, 100, 0))).toBe(true);
-    expect(o.some((p) => near(p, 100 + 6.4, -12.8))).toBe(true);
-    expect(o.some((p) => near(p, 100 - 6.4, -12.8))).toBe(true);
+    const { shaft, head } = arrowParts({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: -100 }, 4);
+    expect(shaft.length).toBeGreaterThan(2);
+    expect(shaft[0]).toEqual({ x: 0, y: 0 });
+    expect(head.some((p) => near(p, 100 + 6.4, -12.8))).toBe(true);
+    expect(head.some((p) => near(p, 100 - 6.4, -12.8))).toBe(true);
   });
 
   it('a short arrow keeps a head of at least 10 px', () => {
-    const o = arrowOutline({ x: 0, y: 0 }, { x: 30, y: 0 }, null, 1);
-    expect(o.some((p) => near(p, 20, 1.6))).toBe(true);
+    const { head } = arrowParts({ x: 0, y: 0 }, { x: 30, y: 0 }, null, 1);
+    expect(head.some((p) => near(p, 20, 1.6))).toBe(true);
+  });
+
+  it('an arrow without length has no parts', () => {
+    expect(arrowParts({ x: 5, y: 5 }, { x: 5, y: 5 }, null, 4).shaft).toEqual([]);
   });
 });
 

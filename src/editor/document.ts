@@ -24,7 +24,7 @@ export type Annotation =
       stroke: Stroke;
       shadow: boolean;
     }
-  | { id: string; tool: 'line'; points: [Point, Point]; stroke: Stroke }
+  | { id: string; tool: 'line'; points: [Point, Point]; stroke: Stroke; shadow: boolean }
   | { id: string; tool: 'rect' | 'ellipse'; box: Rect; stroke: Stroke; fill: Fill; shadow: boolean }
   | { id: string; tool: 'pen'; points: Point[]; stroke: Stroke }
   | {
@@ -66,6 +66,7 @@ export function normalizeDoc(d: Doc): Doc {
     annotations: d.annotations.map((a) => {
       if (a.tool === 'highlighter') return { ...a, opacity: a.opacity ?? 1 };
       if (a.tool === 'pixelate') return { ...a, block: a.block ?? 16 };
+      if (a.tool === 'line') return { ...a, shadow: a.shadow ?? false };
       return a;
     }),
   };
