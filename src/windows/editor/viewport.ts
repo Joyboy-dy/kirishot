@@ -38,3 +38,12 @@ export function zoomAt(
 export function pan(v: View, dx: number, dy: number): View {
   return { ...v, x: v.x + dx, y: v.y + dy };
 }
+
+/** A fitted view follows the box (the window shown, resized); one the user moved stays put. */
+export function followBox(
+  s: { view: View; fitted: boolean },
+  image: { w: number; h: number },
+  box: { width: number; height: number },
+): { view: View; fitted: boolean } {
+  return s.fitted ? { view: fit(image, box), fitted: true } : s;
+}

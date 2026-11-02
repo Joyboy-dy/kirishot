@@ -46,7 +46,7 @@ import { CropShade, SelectionUi } from './tools/SelectionUi';
 import { textPointer } from './tools/text';
 import { TextEditor } from './tools/TextEditor';
 import { useEditorSession } from './useEditorSession';
-import { fit, zoomAt, type View } from './viewport';
+import { fit, followBox, zoomAt, type View } from './viewport';
 
 type ExportButton = 'copy' | 'save' | 'main';
 
@@ -92,6 +92,14 @@ export function Editor() {
   const [box, setBox] = useState({ width: 0, height: 0 });
   const [history, setHistory] = useState<History | null>(null);
   const [view, setView] = useState<View>({ scale: 1, x: 0, y: 0 });
+  // Fitted until the user zooms or pans: the view then follows the window's size (it is measured
+  // hidden, before the window shows at its real size).
+  const [fitted, setFitted] = useState(true);
+  const [seenBox, setSeenBox] = useState(box);
+  const moveView = (next: View | ((v: View) => View)) => {
+    setFitted(false);
+    setView(next);
+  };
   const [tool, setTool] = useState<ToolId>('arrow');
   const [style, setStyle] = useState<Style>(DEFAULT_STYLE);
   const [panning, setPanning] = useState(false);
@@ -130,6 +138,12 @@ export function Editor() {
   useLayoutEffect(() => {
     shownRef.current = shownId;
   });
+  // Before a new capture's fit below, which then wins.
+  if (box.width !== seenBox.width || box.height !== seenBox.height) {
+    setSeenBox(box);
+    const next = history && followBox({ view, fitted }, history.present.size, box).view;
+    if (next && next !== view) setView(next);
+  }
   if (loaded && box.width > 0 && loaded.session.captureId !== shownId) {
     const {
       captureId,
@@ -158,6 +172,7 @@ export function Editor() {
     setCropDraft(null);
     setEditing(null);
     setView(fit({ w: width, h: height }, box));
+    setFitted(true);
   }
 
   // The name a first save would use, asked once per capture.
@@ -203,10 +218,12 @@ export function Editor() {
     return null;
   };
   const fitView = () => {
-    if (doc) setView(fit({ w: doc.size.w, h: doc.size.h }, box));
+    if (!doc) return;
+    setView(fit({ w: doc.size.w, h: doc.size.h }, box));
+    setFitted(true);
   };
   const zoomBy = (factor: number) =>
-    setView((v) => zoomAt(v, factor, { x: box.width / 2, y: box.height / 2 }));
+    moveView((v) => zoomAt(v, factor, { x: box.width / 2, y: box.height / 2 }));
   const [busy, setBusy] = useState(false);
   const ticking = Object.values(buttons).some((b) => b.phase !== 'idle') || Boolean(message);
   useEffect(() => {
@@ -445,7 +462,7 @@ export function Editor() {
       if (e.ctrlKey && e.key === '0') return (e.preventDefault(), fitView());
       if (e.ctrlKey && e.key === '1') {
         e.preventDefault();
-        return setView((v) => zoomAt(v, 1 / v.scale, { x: box.width / 2, y: box.height / 2 }));
+        return moveView((v) => zoomAt(v, 1 / v.scale, { x: box.width / 2, y: box.height / 2 }));
       }
       if (e.ctrlKey && (e.key === '+' || e.key === '=')) return (e.preventDefault(), zoomBy(1.25));
       if (e.ctrlKey && e.key === '-') return (e.preventDefault(), zoomBy(0.8));
@@ -641,7 +658,7 @@ export function Editor() {
             size={box}
             panning={panning}
             tool={tool}
-            onView={setView}
+            onView={moveView}
             onDown={onDown}
             onMove={onMove}
             onUp={onUp}
