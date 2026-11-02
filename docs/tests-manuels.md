@@ -35,3 +35,48 @@
 
 19. Réglages ouverts et actifs : Win + Maj + S puis Impr. écran ouvrent l'écran figé de Kirishot, jamais l'outil de Windows ni le menu Démarrer.
 20. Pendant une sélection, un second Win + Maj + S ne fait rien : ni nouvel écran figé, ni outil de Windows.
+21. Avec le navigateur ou un autre logiciel au premier plan, Win + Maj + S ouvre bien l'écran figé (un essai automatique du 02/11 n'a rien ouvert, à confirmer).
+
+## J2 : usage quotidien
+
+### Écran de sélection
+
+22. Le curseur est une croix sur l'écran figé, une main sur la barre d'outils, une flèche de déplacement dans une sélection, une double flèche sur chaque poignée.
+23. **M** ou le bouton Loupe masque et affiche la loupe ; à la capture suivante, elle garde le dernier état. Près d'un bord, la loupe passe de l'autre côté du curseur.
+24. **C** copie la couleur visée : la pastille « #RRGGBB copié » s'affiche, et Ctrl+V la colle dans le Bloc-notes.
+25. **R**, **W**, **F** changent de mode. **Espace** maintenu pendant le tracé déplace la zone, **Alt** la trace depuis le centre.
+26. **Ctrl+C** sur une zone ajustée la copie sans fichier ni vignette.
+27. Chaque bouton de la barre montre une info-bulle avec son raccourci, et Tab les parcourt avec un contour orange.
+
+### Son et flash
+
+28. Le clic de capture est court et doux. Le flash ne couvre que la zone capturée.
+29. Son et flash coupés dans les réglages : plus rien. Windows réglé sur « réduire les animations » : pas de flash.
+
+### Vignettes
+
+30. Tape du texte dans le Bloc-notes, fais une capture, survole puis clique les boutons de la vignette : la frappe suivante va toujours dans le Bloc-notes (la vignette ne prend jamais le focus).
+31. La vignette apparaît en bas à droite de l'écran de la capture, au-dessus de la barre des tâches, avec « Copiée · enregistrement dans N s ». Ctrl+V colle l'image tout de suite.
+32. Le survol met le compte à rebours en pause. À la fin, la capture est enregistrée une seule fois, puis la vignette part.
+33. Copier, Enregistrer, Modifier et × fonctionnent ; × sur une vignette en attente enregistre quand même la capture (si l'action le demande).
+34. Clic droit : Ouvrir le dossier et Copier le chemin après l'enregistrement, Supprimer jette la capture et son fichier.
+35. Quatre captures rapides : trois vignettes et « +1 » ; la quatrième entre quand une part. Une capture sur l'autre écran déplace la pile.
+36. Glisser une vignette dans Discord, un mail et l'Explorateur dépose le fichier PNG. Pendant le glisser, la zone de notification et les raccourcis répondent.
+37. « Afficher la vignette » désactivé : retour au comportement de J1 (action immédiate et notification).
+
+### Éditeur
+
+38. Un clic sur une vignette ouvre l'éditeur en moins d'une demi-seconde, l'image ajustée à la fenêtre ; « Toujours ouvrir l'éditeur » saute la vignette.
+39. Chaque outil (Flèche, Rectangle, Ellipse, Ligne, Crayon, Surligneur, Texte, Étapes, Masquer, Recadrer) dessine, se sélectionne, se déplace, se restyle depuis la barre et s'annule avec Ctrl+Z.
+40. La flèche se courbe avec la poignée orange du milieu ; Maj aligne flèches et lignes par pas de 15°.
+41. Le surligneur assombrit le texte sans le cacher. Masquer rend un texte illisible.
+42. Taper un texte ne déclenche aucun outil ; Échap ou un clic dehors valide ; un double-clic le modifie.
+43. Supprimer une étape renumérote les suivantes.
+44. Ctrl + molette zoome sous le curseur, Espace + glisser déplace la vue, Ctrl+0 ajuste.
+45. Copier, Enregistrer, Enregistrer sous et Copier et fermer produisent l'image en pleine résolution, recadrage compris (essayer une capture 4K avec un surligneur).
+46. Fermer l'éditeur puis regarder `%APPDATA%\Kirishot\captures\<id>\` : `original.png` et `document.json` avec les annotations.
+47. Navigation au clavier dans la barre de l'éditeur et dans les réglages ; contrastes lisibles en thème clair.
+
+### Réglages › Capture
+
+48. Chaque interrupteur (loupe, son, flash, vignette, toujours ouvrir l'éditeur) et la durée de la vignette sont gardés après un redémarrage. Activer le son joue le clic.
