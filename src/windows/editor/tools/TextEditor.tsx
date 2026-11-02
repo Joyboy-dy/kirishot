@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Annotation } from '@/editor/document';
 import type { View } from '../viewport';
+import { textKey } from './text';
 
 type TextAnnotation = Extract<Annotation, { tool: 'text' }>;
 
@@ -22,11 +23,15 @@ export function TextEditor({ a, view, onDone }: Props) {
     onDone(value);
   };
 
+  // After the frame that shows it: nothing left of the click can take the focus back.
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.focus();
-    el.select();
+    const frame = requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      el.select();
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   // Grows with its content.
@@ -50,7 +55,10 @@ export function TextEditor({ a, view, onDone }: Props) {
       onBlur={() => finish(text)}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === 'Escape') finish(text);
+        if (textKey(e.key, e.ctrlKey) === 'commit') {
+          e.preventDefault();
+          finish(text);
+        }
       }}
       className="absolute resize-none overflow-hidden border-0 bg-transparent p-0 outline-none"
       style={{

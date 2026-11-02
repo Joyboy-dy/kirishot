@@ -12,6 +12,8 @@ export type CanvasPointer = {
   ctrl: boolean;
   /** The Konva node under the pointer, for selection. */
   target: Konva.Node;
+  /** Cancels the browser's default action (the focus change of a press). */
+  preventDefault(): void;
 };
 
 type Props = {
@@ -53,6 +55,7 @@ export const Canvas = forwardRef<Konva.Stage, Props>(function Canvas(p, stageRef
       alt: e.evt.altKey,
       ctrl: e.evt.ctrlKey,
       target: e.target,
+      preventDefault: () => e.evt.preventDefault(),
     };
   };
 

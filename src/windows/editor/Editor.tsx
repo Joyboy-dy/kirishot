@@ -30,6 +30,7 @@ import { AnnotationNode } from './tools/AnnotationNode';
 import type { ToolId } from './tools/catalog';
 import { begin, DRAG_TOOLS, extend, finish } from './tools/create';
 import { CropShade, SelectionUi } from './tools/SelectionUi';
+import { textPointer } from './tools/text';
 import { TextEditor } from './tools/TextEditor';
 import { useEditorSession } from './useEditorSession';
 import { fit, zoomAt, type View } from './viewport';
@@ -296,16 +297,10 @@ export function Editor() {
       return;
     }
     if (tool === 'text') {
-      const size = strokeWidth(doc.size, style.size) * 6;
-      setEditing({
-        id: newId(),
-        tool: 'text',
-        at: p.at,
-        text: '',
-        size,
-        color: style.color,
-        style: 'plain',
-      });
+      // The field opens on the release (spec J2.1 § 3.2): keep the press from moving the focus,
+      // unless a field is open, which this press closes (its blur commits it).
+      textPressEnded.current = editing !== null;
+      if (!editing) p.preventDefault();
       return;
     }
     if (tool === 'step') {
@@ -332,7 +327,26 @@ export function Editor() {
     setDraft((d) => d && extend(d, from, p.at, p));
   };
 
-  const onUp = () => {
+  const textPressEnded = useRef(false);
+  const onUp = (p: CanvasPointer) => {
+    if (tool === 'text' && doc) {
+      const node = p.target.findAncestor('.annotation', true);
+      const hit = doc.annotations.find((a) => a.id === node?.id() && a.tool === 'text');
+      const action = textPointer('up', hit?.id ?? null, textPressEnded.current);
+      textPressEnded.current = false;
+      if (action.type === 'edit' && hit?.tool === 'text') setEditing(hit);
+      if (action.type === 'create')
+        setEditing({
+          id: newId(),
+          tool: 'text',
+          at: p.at,
+          text: '',
+          size: strokeWidth(doc.size, style.size) * 6,
+          color: style.color,
+          style: 'plain',
+        });
+      return;
+    }
     anchor.current = null;
     if (!doc || !draft) return;
     const done = finish(draft);
