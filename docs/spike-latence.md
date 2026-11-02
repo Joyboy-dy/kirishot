@@ -81,3 +81,25 @@ Une série de contrôle de 10 captures avec la combinaison retenue donne 66 à 8
    - Certains antivirus surveillent les hooks clavier. Le hook ne lit que `VK_SNAPSHOT` et passe tout le reste à `CallNextHookEx`, sans le lire.
    - Windows retire un hook dont la procédure est trop lente. La procédure ne fait donc que lancer un fil.
    - Le comportement sur deux écrans et en 4K reste à mesurer pendant les tests manuels de J1.
+
+## Hook et focus (J2, 02/11/2026)
+
+**Constat.** Tant qu'une fenêtre de Kirishot est au premier plan (réglages, écran figé), Windows n'appelle **aucun** hook `WH_KEYBOARD_LL`, ni celui de Kirishot ni celui d'un autre processus (essai avec un hook PowerShell). Win + Maj + S et Impr. écran partent alors à l'Outil Capture. Vérifié avec des touches simulées et avec le clavier physique. Dès que le focus quitte Kirishot, le hook refonctionne.
+
+**Pistes écartées.**
+- Ordre des hooks : réinstaller le hook toutes les 700 ms, donc après la prise de focus, ne change rien.
+- Module nul passé à `SetWindowsHookExW` : passer `GetModuleHandleW(None)` ne change rien.
+- Niveaux d'intégrité : tout tourne au niveau moyen.
+- Aucune dépendance (tao, wry, global-hotkey) n'installe de hook.
+
+La cause exacte n'est pas élucidée ; elle tient à WebView2 au premier plan.
+
+**Solution.** L'entrée brute (`RegisterRawInputDevices`, clavier, `RIDEV_INPUTSINK | RIDEV_NOHOTKEYS`) sur une fenêtre message-only du fil du hook (`src-tauri/src/hotkeys/raw_keys.rs`) :
+- elle reçoit les touches même quand le hook est muet ;
+- `RIDEV_NOHOTKEYS` désactive les raccourcis déclarés par les autres applications tant que Kirishot est au premier plan, dont celui de l'Outil Capture ;
+- Kirishot ne traite ces touches que si sa propre fenêtre est au premier plan ; ailleurs, le hook s'en charge.
+
+**Conséquences.**
+- Pendant qu'une fenêtre de Kirishot est active, les raccourcis globaux des autres applications ne marchent pas (les raccourcis système comme Alt+Tab, Ctrl+Alt+Suppr restent actifs).
+- L'enregistrement remplace celui que tao fait pour le clavier : les événements clavier « device » de tao ne sont plus reçus. Kirishot ne s'en sert pas.
+

@@ -1,5 +1,6 @@
 //! Global shortcuts from the settings.
 mod ll_hook;
+mod raw_keys;
 
 use std::time::Instant;
 

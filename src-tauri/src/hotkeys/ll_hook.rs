@@ -1,6 +1,7 @@
 //! Low-level keyboard hook for the shortcuts Windows keeps for itself. `RegisterHotKey` accepts
 //! PrintScreen but never receives it (spike J0), and Win+Shift+S belongs to the Snipping Tool.
-//! A `WH_KEYBOARD_LL` hook sees keys before Windows does, so Kirishot gets them first.
+//! A `WH_KEYBOARD_LL` hook sees keys before Windows does, so Kirishot gets them first, except
+//! while a Kirishot window is in front: `raw_keys` covers that case.
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -11,8 +12,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, KEYEVENTF_KEYUP, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT, keybd_event,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW, KBDLLHOOKSTRUCT, MSG, PostThreadMessageW, SetWindowsHookExW,
-    UnhookWindowsHookEx, WH_KEYBOARD_LL, WM_KEYDOWN, WM_QUIT, WM_SYSKEYDOWN,
+    CallNextHookEx, DispatchMessageW, GetMessageW, KBDLLHOOKSTRUCT, MSG, PostThreadMessageW,
+    SetWindowsHookExW, UnhookWindowsHookEx, WH_KEYBOARD_LL, WM_KEYDOWN, WM_QUIT, WM_SYSKEYDOWN,
 };
 
 use crate::error::{ErrorCode, KResult, KirishotError};
@@ -85,6 +86,21 @@ fn held(vk: u16) -> bool {
     (unsafe { GetAsyncKeyState(vk as i32) } as u16 & 0x8000) != 0
 }
 
+/// Runs the callback for a pressed key; `true` when it was a Kirishot shortcut.
+pub(crate) fn press(pressed: HookKey) -> bool {
+    // Clone the callback out of the lock: it must stay short, Windows drops slow hooks.
+    let on_press = ON_PRESS.lock().unwrap().clone();
+    let handled = on_press.is_some_and(|f| f(pressed));
+    if handled && pressed.mods.win {
+        // Releasing Win alone would open the Start menu.
+        unsafe {
+            keybd_event(VK_DUMMY, 0, Default::default(), 0);
+            keybd_event(VK_DUMMY, 0, KEYEVENTF_KEYUP, 0);
+        }
+    }
+    handled
+}
+
 unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code >= 0 {
         let key = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
@@ -99,16 +115,8 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
                     win: held(VK_LWIN.0) || held(VK_RWIN.0),
                 },
             };
-            // Clone the callback out of the lock: it must stay short, Windows drops slow hooks.
-            let on_press = ON_PRESS.lock().unwrap().clone();
-            if on_press.is_some_and(|f| f(pressed)) {
+            if press(pressed) {
                 SWALLOWED.store(key.vkCode, Ordering::SeqCst);
-                if pressed.mods.win {
-                    unsafe {
-                        keybd_event(VK_DUMMY, 0, Default::default(), 0);
-                        keybd_event(VK_DUMMY, 0, KEYEVENTF_KEYUP, 0);
-                    }
-                }
                 return LRESULT(1);
             }
         } else if SWALLOWED.load(Ordering::SeqCst) == key.vkCode {
@@ -129,8 +137,13 @@ pub fn install_hook(
         match SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_proc), None, 0) {
             Ok(hook) => {
                 let _ = tx.send(Ok(GetCurrentThreadId()));
+                if let Err(e) = super::raw_keys::listen() {
+                    log::warn!("raw keyboard input unavailable: {e}");
+                }
                 let mut msg = MSG::default();
-                while GetMessageW(&mut msg, None, 0, 0).as_bool() {}
+                while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                    DispatchMessageW(&msg);
+                }
                 let _ = UnhookWindowsHookEx(hook);
             }
             Err(e) => {

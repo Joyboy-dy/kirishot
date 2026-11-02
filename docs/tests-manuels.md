@@ -31,7 +31,7 @@
 17. « Copier seulement » ne crée aucun fichier, et Ctrl+V dans Paint colle l'image.
 18. Dossier de destination supprimé : Kirishot le recrée et y enregistre la capture. Clé USB débranchée : la capture arrive dans `Images\Kirishot`, avec la notification « Dossier de destination inaccessible ».
 
-### Limite connue de J1
+### Raccourcis avec une fenêtre de Kirishot au premier plan (J2)
 
-- Quand la fenêtre des réglages de Kirishot est active, Win + Maj + S et Impr. écran ouvrent l'outil de Windows : le hook clavier ne reçoit pas ces touches tant qu'une fenêtre WebView2 de Kirishot a le focus. Contournement : le menu de la zone de notification.
-- Pour la même raison, appuyer une seconde fois sur le raccourci pendant une sélection peut ouvrir l'outil de Windows par-dessus l'écran figé.
+19. Réglages ouverts et actifs : Win + Maj + S puis Impr. écran ouvrent l'écran figé de Kirishot, jamais l'outil de Windows ni le menu Démarrer.
+20. Pendant une sélection, un second Win + Maj + S ne fait rien : ni nouvel écran figé, ni outil de Windows.
