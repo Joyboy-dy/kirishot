@@ -146,7 +146,7 @@ La règle est globale : tout élément interactif (`button`, `a`, `[role=button]
   - calque 1, `listening(false)` pour l'image de fond : l'image et les annotations validées (le mode `multiply` du surligneur ne mélange qu'avec le même calque) ;
   - calque 2 : l'annotation en cours de tracé ;
   - calque 3 : le `Transformer` et les poignées.
-- Chaque outil a un nœud Konva pour l'affichage et un rendu canvas pur pour l'export, sur le modèle de XenSnip (MIT, attribution dans `THIRD_PARTY.md`). La pixelisation est calculée sur un canvas hors écran mis en cache par annotation, recalculé à la fin d'un déplacement.
+- L'affichage et l'export passent par les mêmes nœuds Konva : l'export redessine la scène à l'échelle 1, sans calque d'interface. Ce qu'on voit est donc ce qu'on exporte, sans second moteur de rendu. XenSnip (MIT, attribution dans `THIRD_PARTY.md`) sert de modèle pour la pixelisation et la saisie de texte. La pixelisation est calculée sur un canvas hors écran mis en cache par annotation, recalculé à la fin d'un déplacement.
 - Export : `stage.toCanvas` à l'échelle 1 sur la zone recadrée, `toBlob` en PNG, envoyé à Rust en binaire brut (`tauri::ipc::Request`). Rust encode au format choisi, enregistre et copie.
 
 ### 4.4 Sauvegarde
@@ -210,7 +210,7 @@ La règle est globale : tout élément interactif (`button`, `a`, `[role=button]
 
 - **Unitaires (Vitest)** : modèle du document (ajout, modification, suppression, annuler, rétablir, limite de 200), renumérotation des étapes, géométrie de la flèche courbe (tangente de la pointe), taille de trait proportionnelle, pixelisation (blocs uniformes), compte à rebours (pause, reprise, expiration unique), placement de la loupe près des bords.
 - **Unitaires (Rust)** : placement et taille de la pile de vignettes dans la zone de travail, machine d'états `pending → delivered | editing`, action automatique appliquée une seule fois, nouveaux réglages et leurs valeurs par défaut.
-- **Fidélité de l'export** : rendu de l'éditeur comparé à l'export au pixel près (pixelmatch, Konva sans affichage), sur le modèle de XenSnip.
+- **Export** : test manuel de l'image exportée (pleine résolution, recadrage, surligneur sur l'image) ; l'affichage et l'export partagent les mêmes nœuds, il n'y a pas de second rendu à comparer.
 - **Manuels** (ajouts à `docs/tests-manuels.md`) : le focus ne passe jamais à la vignette, glisser vers Discord et l'Explorateur, son et flash, navigation au clavier dans la barre de sélection et l'éditeur, contraste en thème clair.
 
 ## 8. Ce que ce jalon change dans la spec v1
