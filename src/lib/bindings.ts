@@ -42,6 +42,8 @@ export const commands = {
 	editorClose: () => typedError<null, KirishotError>(__TAURI_INVOKE("editor_close")),
 	/**  Saves the editor's document (JSON) beside the original. */
 	editorAutosave: (captureId: string, document: string) => typedError<null, KirishotError>(__TAURI_INVOKE("editor_autosave", { captureId, document })),
+	/**  Plays the shutter click, so the settings page can preview it. */
+	playShutterPreview: () => typedError<null, KirishotError>(__TAURI_INVOKE("play_shutter_preview")),
 };
 
 /** Events */

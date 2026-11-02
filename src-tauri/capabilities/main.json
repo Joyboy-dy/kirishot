@@ -9,6 +9,7 @@
     "allow-settings-get",
     "allow-settings-update",
     "allow-open-save-folder",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "allow-play-shutter-preview"
   ]
 }

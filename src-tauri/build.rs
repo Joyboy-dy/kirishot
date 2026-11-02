@@ -32,6 +32,7 @@ fn main() {
                 "editor_close",
                 "editor_export",
                 "editor_autosave",
+                "play_shutter_preview",
             ])),
     )
     .expect("failed to run tauri-build");

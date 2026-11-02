@@ -210,6 +210,14 @@ pub async fn editor_close(app: tauri::AppHandle) -> KResult<()> {
     Ok(())
 }
 
+/// Plays the shutter click, so the settings page can preview it.
+#[tauri::command]
+#[specta::specta]
+pub async fn play_shutter_preview() -> KResult<()> {
+    crate::sound::play();
+    Ok(())
+}
+
 /// Copies text, such as the colour under the magnifier.
 #[tauri::command]
 #[specta::specta]
@@ -320,7 +328,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             thumbnail_copy_path,
             editor_loaded,
             editor_close,
-            editor_autosave
+            editor_autosave,
+            play_shutter_preview
         ])
         .events(collect_events![
             SettingsChanged,

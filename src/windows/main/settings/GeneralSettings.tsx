@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,45 +7,11 @@ import { commands, type AutoAction, type ImageFormat } from '@/lib/ipc';
 import { NO_CHANGE } from '@/lib/settings';
 import { t, type MessageKey } from '@/i18n';
 import { useSettings } from '../useSettings';
+import { Row, Section } from './Layout';
 
 const FORMATS: ImageFormat[] = ['png', 'jpg', 'webp'];
 const FORMAT_LABELS: Record<ImageFormat, string> = { png: 'PNG', jpg: 'JPG', webp: 'WebP' };
 const ACTIONS: AutoAction[] = ['saveAndCopy', 'copy', 'save'];
-
-function Section(props: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="m-0 text-[13px] font-semibold" style={{ color: 'var(--k-text-2)' }}>
-        {props.title}
-      </h2>
-      <div
-        className="flex flex-col rounded-xl"
-        style={{ background: 'var(--k-surface)', border: '1px solid var(--k-border)' }}
-      >
-        {props.children}
-      </div>
-    </section>
-  );
-}
-
-function Row(props: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <div
-      className="flex items-center justify-between gap-6 px-5 py-4"
-      style={{ borderTop: '1px solid var(--k-border)', marginTop: -1 }}
-    >
-      <div className="flex flex-col gap-1">
-        <span className="text-[14px] font-medium">{props.label}</span>
-        {props.hint && (
-          <span className="text-[12.5px]" style={{ color: 'var(--k-text-3)' }}>
-            {props.hint}
-          </span>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-2">{props.children}</div>
-    </div>
-  );
-}
 
 /** Settings › General, J1 subset: destination folder, format, automatic action (spec § 3.9). */
 export function GeneralSettings() {

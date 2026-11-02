@@ -7,3 +7,23 @@ describe('t', () => {
 
   it('returns plain texts as is', () => expect(t('overlay.zone')).toBe('Zone'));
 });
+
+describe('capture settings texts', () => {
+  it('exist for every control of the section', async () => {
+    const fr = (await import('./fr.json')).default as Record<string, string>;
+    const keys = [
+      'settings.capture',
+      'settings.magnifier',
+      'settings.sound',
+      'settings.flash',
+      'settings.thumbnail',
+      'settings.thumbnailDuration',
+      'settings.duration.3',
+      'settings.duration.6',
+      'settings.duration.10',
+      'settings.duration.untilClosed',
+      'settings.alwaysOpenEditor',
+    ];
+    expect(keys.filter((k) => !(k in fr))).toEqual([]);
+  });
+});
