@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ClipboardCheck, Copy, Download, Redo2, Undo2 } from 'lucide-react';
+import { Check, ClipboardCheck, Copy, Download, LoaderCircle, Redo2, Undo2 } from 'lucide-react';
 import { Tip } from '@/components/ui/Tip';
 import { t } from '@/i18n';
 import { toolbarLayout } from './layout';
@@ -15,6 +15,8 @@ type Props = {
   canUndo: boolean;
   canRedo: boolean;
   busy: boolean;
+  /** What each export button shows: its icon, a spinner or a check (spec J2.1 § 4.2). */
+  views: Record<'copy' | 'save' | 'main', 'icon' | 'spinner' | 'check'>;
   onTool(tool: ToolId): void;
   onStyle(patch: StylePatch): void;
   onUndo(): void;
@@ -52,6 +54,14 @@ function BarButton(props: {
       </button>
     </Tip>
   );
+}
+
+/** An export button's content: its icon, or the spinner or check that replaces it. */
+function Result({ view, children }: { view: 'icon' | 'spinner' | 'check'; children: ReactNode }) {
+  if (view === 'spinner')
+    return <LoaderCircle size={17} strokeWidth={2} className="animate-spin" />;
+  if (view === 'check') return <Check size={17} strokeWidth={2.4} aria-hidden />;
+  return <>{children}</>;
 }
 
 const Divider = () => (
@@ -137,7 +147,9 @@ export function TopBar(p: Props) {
         disabled={p.busy}
         onClick={p.onCopy}
       >
-        <Copy size={17} strokeWidth={1.9} />
+        <Result view={p.views.copy}>
+          <Copy size={17} strokeWidth={1.9} />
+        </Result>
       </BarButton>
       <BarButton
         label={t('editor.save')}
@@ -146,7 +158,9 @@ export function TopBar(p: Props) {
         disabled={p.busy}
         onClick={p.onSave}
       >
-        <Download size={17} strokeWidth={1.9} />
+        <Result view={p.views.save}>
+          <Download size={17} strokeWidth={1.9} />
+        </Result>
       </BarButton>
       <Tip label={t('editor.copyAndClose')} keys={['Ctrl', 'Entrée']}>
         <button
@@ -157,9 +171,15 @@ export function TopBar(p: Props) {
           className={`k-press ml-1 flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border-0 text-[13px] font-semibold disabled:opacity-40 ${dense ? 'w-8 px-0' : 'px-3'}`}
           style={{ background: 'var(--k-accent)', color: 'var(--k-ink)' }}
         >
-          {layout === 'full' && t('editor.copyAndClose')}
-          {layout === 'compact' && t('editor.done')}
-          {dense && <ClipboardCheck size={17} strokeWidth={2} />}
+          {p.views.main !== 'icon' ? (
+            <Result view={p.views.main}>{null}</Result>
+          ) : (
+            <>
+              {layout === 'full' && t('editor.copyAndClose')}
+              {layout === 'compact' && t('editor.done')}
+              {dense && <ClipboardCheck size={17} strokeWidth={2} />}
+            </>
+          )}
         </button>
       </Tip>
     </header>

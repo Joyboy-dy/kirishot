@@ -1,6 +1,6 @@
-// The final image: the same Konva nodes as on screen, redrawn at 1 image pixel per pixel,
-// without the drawing and handle layers (spec J2 § 4.3).
-import type Konva from 'konva';
+// The final image: a copy of the same Konva nodes as on screen, redrawn at 1 image pixel per
+// pixel, without the drawing and handle layers (spec J2 § 4.3, J2.1 § 3.2).
+import Konva from 'konva';
 import { invoke } from '@tauri-apps/api/core';
 import type { Doc, Rect } from '@/editor/document';
 import type { ExportResult } from '@/lib/ipc';
@@ -12,28 +12,34 @@ export function exportRect(doc: Doc): Rect {
   return doc.crop ?? { x: 0, y: 0, width: doc.size.w, height: doc.size.h };
 }
 
+/**
+ * The content layer redrawn at 1 image pixel per pixel on a stage of its own, off screen: the
+ * visible stage is never moved, so the view does not flash or jump (spec J2.1 § 3.2).
+ */
 async function renderPng(stage: Konva.Stage, doc: Doc): Promise<Uint8Array> {
-  const hidden = stage.find('.draft, .ui');
-  const content = stage.find('.content');
-  const views = content.map((layer) => ({
-    layer,
-    x: layer.x(),
-    y: layer.y(),
-    scale: layer.scaleX(),
-  }));
-  hidden.forEach((layer) => layer.hide());
-  // Image pixels on output pixels, 1:1: no rounding of the size, no sub-pixel offset.
+  const content = stage.findOne<Konva.Layer>('.content');
+  if (!content) throw new Error("L'image n'est pas affichée");
   const r = exportRect(doc);
-  content.forEach((layer) => layer.setAttrs({ x: -r.x, y: -r.y, scaleX: 1, scaleY: 1 }));
+  const offscreen = new Konva.Stage({
+    container: document.createElement('div'),
+    width: r.width,
+    height: r.height,
+  });
   try {
-    const canvas = stage.toCanvas({ x: 0, y: 0, width: r.width, height: r.height, pixelRatio: 1 });
+    offscreen.add(content.clone({ x: -r.x, y: -r.y, scaleX: 1, scaleY: 1 }));
+    const canvas = offscreen.toCanvas({
+      x: 0,
+      y: 0,
+      width: r.width,
+      height: r.height,
+      pixelRatio: 1,
+    });
     const blob = await new Promise<Blob>((resolve, reject) =>
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob'))), 'image/png'),
     );
     return new Uint8Array(await blob.arrayBuffer());
   } finally {
-    views.forEach((v) => v.layer.setAttrs({ x: v.x, y: v.y, scaleX: v.scale, scaleY: v.scale }));
-    hidden.forEach((layer) => layer.show());
+    offscreen.destroy();
   }
 }
 

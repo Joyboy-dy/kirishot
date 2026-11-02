@@ -23,6 +23,7 @@ import { Canvas, type CanvasPointer } from './Canvas';
 import { useAutosave } from './autosave';
 import { ContextBubble } from './ContextBubble';
 import { exportImage, type ExportIntent } from './export';
+import { buttonView, FEEDBACK, messageVisible, type ButtonState } from './feedback';
 import { keyAction, type EditorAction } from './keys';
 import { toolbarLayout } from './layout';
 import { StatusBar } from './StatusBar';
@@ -37,6 +38,10 @@ import { textPointer } from './tools/text';
 import { TextEditor } from './tools/TextEditor';
 import { useEditorSession } from './useEditorSession';
 import { fit, zoomAt, type View } from './viewport';
+
+type ExportButton = 'copy' | 'save' | 'main';
+const IDLE: ButtonState = { phase: 'idle', since: 0 };
+const ALL_IDLE: Record<ExportButton, ButtonState> = { copy: IDLE, save: IDLE, main: IDLE };
 
 const DEFAULT_STYLE: Style = {
   color: PALETTE[0],
@@ -71,7 +76,10 @@ export function Editor() {
   const [tool, setTool] = useState<ToolId>('arrow');
   const [style, setStyle] = useState<Style>(DEFAULT_STYLE);
   const [panning, setPanning] = useState(false);
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const [message, setMessage] = useState<{ text: string; error: boolean; at: number } | null>(null);
+  const [buttons, setButtons] = useState(ALL_IDLE);
+  // The clock of the feedback: it only ticks while a button or a message is showing a result.
+  const [now, setNow] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [draft, setDraft] = useState<Annotation | null>(null);
   const [cropDraft, setCropDraft] = useState<Rect | null>(null);
@@ -88,6 +96,7 @@ export function Editor() {
     setShownId(captureId);
     setHistory(init(newDoc(captureId, width, height)));
     setMessage(null);
+    setButtons(ALL_IDLE);
     setSelected([]);
     setDraft(null);
     setCropDraft(null);
@@ -115,25 +124,64 @@ export function Editor() {
   const zoomBy = (factor: number) =>
     setView((v) => zoomAt(v, factor, { x: box.width / 2, y: box.height / 2 }));
   const [busy, setBusy] = useState(false);
+  const ticking = Object.values(buttons).some((b) => b.phase !== 'idle') || Boolean(message);
+  useEffect(() => {
+    if (!ticking) return;
+    const tick = () => {
+      const at = Date.now();
+      setNow(at);
+      setButtons((all) => {
+        const expired = (Object.keys(all) as ExportButton[]).filter(
+          (k) => all[k].phase === 'done' && buttonView(all[k], at) === 'icon',
+        );
+        if (expired.length === 0) return all;
+        return { ...all, ...Object.fromEntries(expired.map((k) => [k, IDLE])) };
+      });
+      setMessage((m) => (m && !messageVisible(m, at) ? null : m));
+    };
+    tick();
+    const timer = window.setInterval(tick, 100);
+    return () => window.clearInterval(timer);
+  }, [ticking]);
+
+  // The result shows on the button used (a check) and in the status bar (spec J2.1 § 4.2).
   const runExport = (intent: ExportIntent) => {
     if (!doc || !stage || busy) return;
+    const key: ExportButton =
+      intent === 'copy' ? 'copy' : intent === 'copyAndClose' ? 'main' : 'save';
+    const mark = (phase: ButtonState['phase']) =>
+      setButtons((all) => ({
+        ...all,
+        [key]: phase === 'idle' ? IDLE : { phase, since: Date.now() },
+      }));
     setBusy(true);
     setSelected([]);
-    exportImage(stage, doc, intent)
+    setMessage(null);
+    mark('busy');
+    // Copy and close: copy, show the check, then close (closing at once would hide it).
+    exportImage(stage, doc, intent === 'copyAndClose' ? 'copy' : intent)
       .then((r) => {
-        if (r.cancelled) return;
+        if (r.cancelled) return mark('idle');
+        mark('done');
         const name = r.saved?.split(/[\\/]/).pop() ?? '';
         const text = r.saved
           ? r.usedFallback
             ? t('editor.savedFallback', { name })
             : t('editor.saved', { name })
           : t('editor.copied');
-        setMessage({ text, error: false });
+        setMessage({ text, error: false, at: Date.now() });
+        if (intent === 'copyAndClose')
+          window.setTimeout(() => void commands.editorClose(), FEEDBACK.closeDelayMs);
       })
       .catch((e: unknown) => {
+        mark('idle');
         const text =
           e instanceof Error ? e.message : ((e as { message?: string }).message ?? String(e));
-        setMessage({ text: t('editor.exportFailed', { message: text }), error: true });
+        setMessage({
+          text: t('editor.exportFailed', { message: text }),
+          error: true,
+          at: Date.now(),
+        });
       })
       .finally(() => setBusy(false));
   };
@@ -366,6 +414,11 @@ export function Editor() {
         canUndo={(history?.past.length ?? 0) > 0}
         canRedo={(history?.future.length ?? 0) > 0}
         busy={!doc || busy}
+        views={{
+          copy: buttonView(buttons.copy, now),
+          save: buttonView(buttons.save, now),
+          main: buttonView(buttons.main, now),
+        }}
         onTool={changeTool}
         onStyle={changeStyle}
         onUndo={() => setHistory((h) => h && undo(h))}
@@ -480,7 +533,7 @@ export function Editor() {
         annotations={doc?.annotations.length ?? 0}
         compact={toolbarLayout(box.width) === 'narrow'}
         zoom={view.scale}
-        message={message}
+        message={message && messageVisible(message, now) ? message : null}
         onZoomIn={() => zoomBy(1.25)}
         onZoomOut={() => zoomBy(0.8)}
         onFit={fitView}
