@@ -115,6 +115,9 @@ export type AfterCaptureSettings = {
 	alwaysOpenEditor: boolean,
 };
 
+/**  After drawing, keep the tool (the convention of screenshot editors) or select the new shape. */
+export type AfterDraw = "keep" | "select";
+
 export type AppInfo = {
 	version: string,
 };
@@ -174,6 +177,8 @@ export type EditorSettings = {
 	recentColors: string[],
 	/**  Ask before closing a capture with unsaved changes (spec J3 § 3.5). */
 	confirmClose: boolean,
+	/**  What the editor does once an annotation is drawn. */
+	afterDraw: AfterDraw,
 };
 
 /**  Stable error codes shared with the front end, which translates them. */
@@ -337,6 +342,7 @@ export type SettingsPatch = {
 	retention: Retention | null,
 	recentColors: string[] | null,
 	confirmClose: boolean | null,
+	afterDraw: AfterDraw | null,
 };
 
 /**  What the settings page displays: the settings plus the resolved destination folder. */

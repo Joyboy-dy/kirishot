@@ -22,4 +22,5 @@ export const NO_CHANGE: SettingsPatch = {
   retention: null,
   recentColors: null,
   confirmClose: null,
+  afterDraw: null,
 };

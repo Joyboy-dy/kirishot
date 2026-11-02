@@ -18,7 +18,8 @@ import {
 } from '@/editor/document';
 import { commit, init, preview, redo, settle, undo, type History } from '@/editor/history';
 import { PALETTE, strokeWidth } from '@/editor/style';
-import { commands, events, type CloseReason } from '@/lib/ipc';
+import { commands, events, type AfterDraw, type CloseReason, type Settings } from '@/lib/ipc';
+import { afterDrawing } from './afterDraw';
 import { NO_CHANGE } from '@/lib/settings';
 import { t } from '@/i18n';
 import { Canvas, type CanvasPointer } from './Canvas';
@@ -286,14 +287,18 @@ export function Editor() {
       .finally(() => setBusy(false));
   };
 
-  // The setting « Demander avant de fermer », kept in sync with the settings page.
+  // The editor settings (« Demander avant de fermer », « Après une annotation »), kept in sync
+  // with the settings page.
+  const [afterDraw, setAfterDraw] = useState<AfterDraw>('keep');
   useEffect(() => {
+    const follow = (s: Settings) => {
+      setConfirmClose(s.editor.confirmClose);
+      setAfterDraw(s.editor.afterDraw);
+    };
     void commands.settingsGet().then((r) => {
-      if (r.status === 'ok') setConfirmClose(r.data.settings.editor.confirmClose);
+      if (r.status === 'ok') follow(r.data.settings);
     });
-    const unlisten = events.settingsChanged.listen((e) =>
-      setConfirmClose(e.payload.settings.editor.confirmClose),
-    );
+    const unlisten = events.settingsChanged.listen((e) => follow(e.payload.settings));
     return () => void unlisten.then((stop) => stop());
   }, []);
 
@@ -489,16 +494,17 @@ export function Editor() {
       return;
     }
     if (tool === 'step') {
+      const id = newId();
       record(
         add(doc, {
-          id: newId(),
+          id,
           tool: 'step',
           at: p.at,
           color: style.color,
           size: strokeWidth(doc.size, style.size),
         }),
       );
-      return;
+      return drawn(id);
     }
     anchor.current = p.at;
     if (tool === 'crop') return setCropDraft({ ...p.at, width: 0, height: 0 });
@@ -536,7 +542,17 @@ export function Editor() {
     if (!doc || !draft) return;
     const done = finish(draft);
     setDraft(null);
-    if (done) record(add(doc, done));
+    if (!done) return;
+    record(add(doc, done));
+    drawn(done.id);
+  };
+
+  // A new annotation: keep the tool, or select it, as the setting says.
+  const drawn = (id: string) => {
+    const next = afterDrawing(afterDraw, id);
+    if (!next) return;
+    setTool(next.tool);
+    setSelected(next.selected);
   };
 
   const finishText = (a: TextAnnotation, text: string) => {
@@ -545,7 +561,9 @@ export function Editor() {
     const exists = doc.annotations.some((x) => x.id === a.id);
     const trimmed = text.replace(/\s+$/, '');
     if (!trimmed) return exists && record(remove(doc, [a.id]));
-    record(exists ? update(doc, a.id, { text: trimmed }) : add(doc, { ...a, text: trimmed }));
+    if (exists) return record(update(doc, a.id, { text: trimmed }));
+    record(add(doc, { ...a, text: trimmed }));
+    drawn(a.id);
   };
 
   const onHandle = (id: string, patch: Partial<Annotation>, final: boolean) => {

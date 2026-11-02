@@ -24,6 +24,16 @@ pub struct EditorSettings {
     pub recent_colors: Vec<String>,
     /// Ask before closing a capture with unsaved changes (spec J3 § 3.5).
     pub confirm_close: bool,
+    /// What the editor does once an annotation is drawn.
+    pub after_draw: AfterDraw,
+}
+
+/// After drawing, keep the tool (the convention of screenshot editors) or select the new shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum AfterDraw {
+    Keep,
+    Select,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -205,6 +215,7 @@ impl Default for Settings {
             editor: EditorSettings {
                 recent_colors: Vec::new(),
                 confirm_close: true,
+                after_draw: AfterDraw::Keep,
             },
             onboarding_done: false,
         }
@@ -244,6 +255,7 @@ pub struct SettingsPatch {
     pub retention: Option<Retention>,
     pub recent_colors: Option<Vec<String>>,
     pub confirm_close: Option<bool>,
+    pub after_draw: Option<AfterDraw>,
 }
 
 /// How long the history keeps captures; a patch cannot carry `null` to mean "forever".
@@ -287,6 +299,7 @@ impl SettingsPatch {
             retention: None,
             recent_colors: None,
             confirm_close: None,
+            after_draw: None,
         }
     }
 }
@@ -361,6 +374,9 @@ pub fn apply_patch(s: &mut Settings, p: SettingsPatch) {
     if let Some(on) = p.confirm_close {
         s.editor.confirm_close = on;
     }
+    if let Some(after) = p.after_draw {
+        s.editor.after_draw = after;
+    }
 }
 
 #[cfg(test)]
@@ -391,7 +407,7 @@ mod tests {
         assert_eq!(v["history"], json!({"retentionDays": 30}));
         assert_eq!(
             v["editor"],
-            json!({"recentColors": [], "confirmClose": true})
+            json!({"recentColors": [], "confirmClose": true, "afterDraw": "keep"})
         );
         assert_eq!(
             v["system"],
@@ -432,6 +448,7 @@ mod tests {
                 retention: Some(Retention::Forever),
                 recent_colors: Some(vec!["#FF5B38".into()]),
                 confirm_close: Some(false),
+                after_draw: Some(AfterDraw::Select),
                 ..SettingsPatch::empty()
             },
         );
@@ -442,6 +459,7 @@ mod tests {
         assert_eq!(s.history.retention_days, None);
         assert_eq!(s.editor.recent_colors, vec!["#FF5B38".to_string()]);
         assert!(!s.editor.confirm_close);
+        assert_eq!(s.editor.after_draw, AfterDraw::Select);
         apply_patch(
             &mut s,
             SettingsPatch {

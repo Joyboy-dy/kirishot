@@ -33,7 +33,7 @@ const DEFAULTS = {
   },
   history: { retentionDays: 30 },
   system: { launchAtStartup: true, language: 'auto', theme: 'system', checkUpdates: true },
-  editor: { recentColors: [], confirmClose: true },
+  editor: { recentColors: [], confirmClose: true, afterDraw: 'keep' },
   onboardingDone: false,
 } satisfies Settings;
 
@@ -61,6 +61,7 @@ const EDITABLE = [
   'system.theme',
   'editor.recentColors',
   'editor.confirmClose',
+  'editor.afterDraw',
 ];
 
 /** Settings knowingly not shown, each with its reason (spec J3 § 4.4). */

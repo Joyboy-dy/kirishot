@@ -1,5 +1,5 @@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import type { AutoAction, ThumbnailDuration } from '@/lib/ipc';
+import type { AfterDraw, AutoAction, ThumbnailDuration } from '@/lib/ipc';
 import { NO_CHANGE } from '@/lib/settings';
 import { t, type MessageKey } from '@/i18n';
 import type { useSettings } from '../useSettings';
@@ -79,6 +79,17 @@ export function AfterCaptureSettings({
           checked={editor.confirmClose}
           onChange={(confirmClose) => void update({ ...NO_CHANGE, confirmClose })}
         />
+        <Row label={t('settings.afterDraw')} hint={t('settings.afterDraw.hint')}>
+          <Choice<AfterDraw>
+            label={t('settings.afterDraw')}
+            value={editor.afterDraw}
+            options={[
+              { value: 'keep', label: t('settings.afterDraw.keep') },
+              { value: 'select', label: t('settings.afterDraw.select') },
+            ]}
+            onChange={(afterDraw) => void update({ ...NO_CHANGE, afterDraw })}
+          />
+        </Row>
       </Section>
     </>
   );
