@@ -52,7 +52,11 @@ export function ShortcutsPage() {
       if (e.payload.accel) void set(slot, e.payload.accel);
     });
     void commands.shortcutRecord(true);
+    // Leaving the window ends the wait (Rust stops recording too).
+    const leave = () => setRecording(null);
+    window.addEventListener('blur', leave);
     return () => {
+      window.removeEventListener('blur', leave);
       void commands.shortcutRecord(false);
       void unlisten.then((stop) => stop());
     };

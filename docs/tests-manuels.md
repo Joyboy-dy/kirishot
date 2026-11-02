@@ -164,3 +164,6 @@
 99. Réglages en quatre onglets : chaque réglage affiché agit ; le modèle de nom montre un aperçu qui suit la saisie, les jetons s'insèrent au curseur.
 100. Thème Clair, Sombre, Comme Windows : la fenêtre principale, l'éditeur et les vignettes suivent aussitôt ; l'écran de sélection reste sombre.
 101. Espacements des réglages : titre de section, puis un vrai espace avant la carte ; lignes aérées, libellés et contrôles alignés.
+102. Capture enregistrée par la vignette, annotée, fermée avec « Ne pas enregistrer », puis rouverte depuis l'Historique : le bouton Enregistrer est actif et la fermeture demande d'enregistrer. Une capture rouverte sans changement depuis son dernier enregistrement reste grisée.
+103. Supprimer à la main un dossier de `%APPDATA%\Kirishot\history` puis relancer Kirishot : la capture disparaît de l'Historique, sans carte vide.
+104. Raccourcis : cliquer sur une ligne, passer dans une autre application et taper Ctrl+S : rien n'est enregistré et Ctrl+S marche normalement là-bas. Fermer la fenêtre pendant l'attente : Win + Maj + S capture toujours. Maj+A ou Alt+1 ne sont pas acceptés comme raccourci.

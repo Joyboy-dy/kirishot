@@ -26,7 +26,7 @@ import { useAutosave } from './autosave';
 import { exportImage, type ExportIntent } from './export';
 import { buttonView, closeAfterCopy, FEEDBACK, messageVisible, type ButtonState } from './feedback';
 import { keyAction, type EditorAction } from './keys';
-import { saveState, type SaveState } from './save';
+import { saveState, savedDocOnOpen, type SaveState } from './save';
 import { afterChoice, closeDecision, hasUnsavedChanges, type CloseChoice } from './closing';
 import { CloseDialog } from './CloseDialog';
 import { rememberColor } from './ColorPicker';
@@ -130,13 +130,21 @@ export function Editor() {
     shownRef.current = shownId;
   });
   if (loaded && box.width > 0 && loaded.session.captureId !== shownId) {
-    const { captureId, width, height, savedPath: knownPath, document } = loaded.session;
+    const {
+      captureId,
+      width,
+      height,
+      savedPath: knownPath,
+      savedDoc: knownDoc,
+      document,
+    } = loaded.session;
     // Reopened from the history: its annotations come back, still editable.
     const opened = (document && parseDoc(document, captureId)) || newDoc(captureId, width, height);
     setShownId(captureId);
     setHistory(init(opened));
     setSavedPath(knownPath);
-    setSavedDoc(knownPath ? opened : null);
+    // Annotations kept by the history but never saved to the file show as unsaved.
+    setSavedDoc(savedDocOnOpen(opened, knownPath, knownDoc));
     setPendingName(null);
     setOpenedDoc(opened);
     setClosing(null);

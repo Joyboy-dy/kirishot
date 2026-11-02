@@ -27,7 +27,7 @@ pub(crate) fn mods_from(held: impl Fn(u16) -> bool) -> Mods {
     }
 }
 
-fn kirishot_in_front() -> bool {
+pub(crate) fn kirishot_in_front() -> bool {
     let mut pid = 0u32;
     unsafe { GetWindowThreadProcessId(GetForegroundWindow(), Some(&mut pid)) };
     pid == std::process::id()

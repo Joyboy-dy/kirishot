@@ -51,9 +51,14 @@ pub fn recorded(key: HookKey) -> Recorded {
     .into_iter()
     .filter_map(|(on, n)| on.then_some(n))
     .collect();
-    // A plain key would steal typing everywhere; PrintScreen and F-keys may stand alone.
+    // A plain key would steal typing everywhere; PrintScreen and F-keys may stand alone. A
+    // letter or digit needs Ctrl or Win: Maj+A or Alt+1 are typed every day.
     let stands_alone = name == "PrintScreen" || name.starts_with('F') && name.len() > 1;
     if mods.is_empty() && !stands_alone {
+        return Recorded::Wait;
+    }
+    let typed = name.len() == 1;
+    if typed && !(m.ctrl || m.win) {
         return Recorded::Wait;
     }
     let mut parts = mods;
@@ -115,5 +120,30 @@ mod tests {
             ..Mods::default()
         };
         assert_eq!(press(0x31, ctrl), Recorded::Accel("Ctrl+1".into()));
+    }
+
+    #[test]
+    fn shift_or_alt_alone_with_a_letter_would_steal_typing() {
+        let shift = Mods {
+            shift: true,
+            ..Mods::default()
+        };
+        let alt = Mods {
+            alt: true,
+            ..Mods::default()
+        };
+        assert_eq!(press(0x41, shift), Recorded::Wait);
+        assert_eq!(press(0x31, alt), Recorded::Wait);
+        let ctrl_alt = Mods {
+            ctrl: true,
+            alt: true,
+            ..Mods::default()
+        };
+        assert_eq!(press(0x41, ctrl_alt), Recorded::Accel("Ctrl+Alt+A".into()));
+        // Maj + Impr. écran stays allowed (the default full-screen shortcut).
+        assert_eq!(
+            press(0x2C, shift),
+            Recorded::Accel("Shift+PrintScreen".into())
+        );
     }
 }

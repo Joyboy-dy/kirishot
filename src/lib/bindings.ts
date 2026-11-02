@@ -165,6 +165,8 @@ export type EditorSession = {
 	savedPath: string | null,
 	/**  The autosaved document, when the capture is reopened from the history. */
 	document: string | null,
+	/**  The fingerprint of the document in `saved_path` (`None`: the original image). */
+	savedDoc: string | null,
 };
 
 export type EditorSettings = {
@@ -207,6 +209,11 @@ export type HistoryEntry = {
 	annotated: boolean,
 	/**  Bytes used in the history folder. */
 	bytes: number | null,
+	/**
+	 *  The fingerprint of the editor document last saved to `saved_path`; `None` when the file
+	 *  holds the original image (saved by the thumbnail) — spec J3 § 3.2.
+	 */
+	savedDoc?: string | null,
 };
 
 export type HistorySettings = {

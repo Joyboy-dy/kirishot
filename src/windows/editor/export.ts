@@ -4,6 +4,7 @@ import Konva from 'konva';
 import { invoke } from '@tauri-apps/api/core';
 import type { Doc, Rect } from '@/editor/document';
 import type { ExportResult } from '@/lib/ipc';
+import { docHash } from './save';
 
 export type ExportIntent = 'copy' | 'save' | 'saveVersion' | 'saveAs' | 'copyAndClose';
 
@@ -58,6 +59,8 @@ export async function exportImage(
       'x-kirishot-capture': doc.captureId,
       'x-kirishot-path': encodeURIComponent(file.path ?? ''),
       'x-kirishot-name': encodeURIComponent(file.name ?? ''),
+      // The document the saved file will show, so a reopened capture knows if it is unsaved.
+      'x-kirishot-doc': docHash(doc),
     },
   });
 }

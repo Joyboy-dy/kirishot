@@ -206,8 +206,9 @@ pub async fn editor_export(
     let name = header("x-kirishot-name")
         .and_then(|n| percent_decode(&n))
         .filter(|n| !n.trim().is_empty());
+    let doc_hash = header("x-kirishot-doc").filter(|h| !h.is_empty());
     tauri::async_runtime::spawn_blocking(move || {
-        editor::export(&app, &capture_id, intent, png, current, name)
+        editor::export(&app, &capture_id, intent, png, current, name, doc_hash)
     })
     .await
     .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))?
@@ -303,7 +304,7 @@ pub async fn editor_rename(
         };
         KirishotError::new(ErrorCode::Save, message)
     })?;
-    crate::history::mark_saved(&app, &capture_id, &next);
+    crate::history::mark_moved(&app, &capture_id, &next);
     Ok(Some(next.to_string_lossy().into_owned()))
 }
 
@@ -507,7 +508,23 @@ pub async fn shortcut_set(
 /// the `shortcut-recorded` event.
 #[tauri::command]
 #[specta::specta]
-pub async fn shortcut_record(app: tauri::AppHandle, on: bool) -> KResult<()> {
+pub async fn shortcut_record(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    on: bool,
+) -> KResult<()> {
+    if on {
+        // The page cannot stop it once it is closed or left: the window does.
+        let handle = app.clone();
+        window.on_window_event(move |event| {
+            if matches!(
+                event,
+                tauri::WindowEvent::Focused(false) | tauri::WindowEvent::Destroyed
+            ) {
+                crate::hotkeys::record(&handle, false);
+            }
+        });
+    }
     let (tx, rx) = std::sync::mpsc::channel();
     let handle = app.clone();
     app.run_on_main_thread(move || {

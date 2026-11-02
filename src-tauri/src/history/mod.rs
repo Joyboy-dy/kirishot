@@ -65,8 +65,17 @@ pub fn delete_entry(dir: &Path, index: &mut Index, id: &str) -> bool {
     true
 }
 
-/// The capture was saved to `path` (the last save wins).
-pub fn apply_saved(index: &mut Index, id: &str, path: &str) -> bool {
+/// The capture was saved to `path` (the last save wins), with the fingerprint of the editor
+/// document it holds, or `None` for the original image.
+pub fn apply_saved(index: &mut Index, id: &str, path: &str, doc: Option<&str>) -> bool {
+    index.update(id, |e| {
+        e.saved_path = Some(path.to_string());
+        e.saved_doc = doc.map(str::to_string);
+    })
+}
+
+/// The saved file was renamed: same content, new path.
+pub fn apply_moved(index: &mut Index, id: &str, path: &str) -> bool {
     index.update(id, |e| e.saved_path = Some(path.to_string()))
 }
 
@@ -112,6 +121,7 @@ pub fn record(
         copied: false,
         annotated: false,
         bytes: 0.0,
+        saved_doc: None,
     };
     change(app, |_, index| {
         index.upsert(entry);
@@ -133,9 +143,20 @@ pub fn record(
     });
 }
 
+/// Saved by the thumbnail or the immediate action: the file is the original image.
 pub fn mark_saved(app: &tauri::AppHandle, id: &str, path: &Path) {
+    mark_saved_doc(app, id, path, None);
+}
+
+/// Saved from the editor: `doc` is the fingerprint of the document the file shows.
+pub fn mark_saved_doc(app: &tauri::AppHandle, id: &str, path: &Path, doc: Option<&str>) {
     let path = path.to_string_lossy().into_owned();
-    change(app, |_, index| apply_saved(index, id, &path));
+    change(app, |_, index| apply_saved(index, id, &path, doc));
+}
+
+pub fn mark_moved(app: &tauri::AppHandle, id: &str, path: &Path) {
+    let path = path.to_string_lossy().into_owned();
+    change(app, |_, index| apply_moved(index, id, &path));
 }
 
 pub fn mark_copied(app: &tauri::AppHandle, id: &str) {
@@ -267,12 +288,44 @@ mod tests {
         let a = id();
         write_capture(&dir, &a, &png(), b"jpg").unwrap();
         let mut index = Index::rebuild(&dir);
-        apply_saved(&mut index, &a, &saved.to_string_lossy());
+        apply_saved(&mut index, &a, &saved.to_string_lossy(), None);
         assert!(delete_entry(&dir, &mut index, &a));
         assert!(!dir.join(&a).exists());
         assert!(index.entries.is_empty());
         assert!(saved.exists());
         assert!(!delete_entry(&dir, &mut index, &a));
+    }
+
+    #[test]
+    fn a_save_from_the_editor_keeps_the_document_fingerprint() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = id();
+        write_capture(dir.path(), &a, &png(), b"jpg").unwrap();
+        let mut index = Index::rebuild(dir.path());
+        apply_saved(&mut index, &a, r"C:\x\a.png", Some("1a2b3c4d"));
+        assert_eq!(index.entries[0].saved_doc.as_deref(), Some("1a2b3c4d"));
+        // A save of the original (thumbnail) has no fingerprint.
+        apply_saved(&mut index, &a, r"C:\x\a.png", None);
+        assert_eq!(index.entries[0].saved_doc, None);
+        // A rename keeps it.
+        apply_saved(&mut index, &a, r"C:\x\a.png", Some("1a2b3c4d"));
+        apply_moved(&mut index, &a, r"C:\x\b.png");
+        assert_eq!(index.entries[0].saved_path.as_deref(), Some(r"C:\x\b.png"));
+        assert_eq!(index.entries[0].saved_doc.as_deref(), Some("1a2b3c4d"));
+    }
+
+    #[test]
+    fn a_j3_index_without_fingerprints_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = id();
+        write_capture(dir.path(), &a, &png(), b"jpg").unwrap();
+        let json = format!(
+            r#"[{{"id":"{a}","createdAt":"2026-11-02T10:00:00+01:00","size":{{"w":4,"h":3}},"source":{{"kind":"region","windowTitle":null}},"savedPath":null,"copied":false,"annotated":false,"bytes":10.0}}]"#
+        );
+        std::fs::write(dir.path().join(INDEX_FILE), json).unwrap();
+        let index = Index::load(dir.path());
+        assert_eq!(index.entries.len(), 1);
+        assert_eq!(index.entries[0].saved_doc, None);
     }
 
     #[test]
@@ -282,10 +335,10 @@ mod tests {
         write_capture(dir.path(), &a, &png(), b"jpg").unwrap();
         let mut index = Index::rebuild(dir.path());
         index.update(&a, |e| e.copied = true);
-        assert!(apply_saved(&mut index, &a, r"C:\x\a.png"));
-        assert!(apply_saved(&mut index, &a, r"C:\x\b.png"));
+        assert!(apply_saved(&mut index, &a, r"C:\x\a.png", None));
+        assert!(apply_saved(&mut index, &a, r"C:\x\b.png", None));
         assert_eq!(index.entries[0].saved_path.as_deref(), Some(r"C:\x\b.png"));
         assert!(index.entries[0].copied);
-        assert!(!apply_saved(&mut index, "zz", "p"));
+        assert!(!apply_saved(&mut index, "zz", "p", None));
     }
 }

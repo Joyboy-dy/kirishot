@@ -27,6 +27,8 @@ pub struct EditorSession {
     pub saved_path: Option<String>,
     /// The autosaved document, when the capture is reopened from the history.
     pub document: Option<String>,
+    /// The fingerprint of the document in `saved_path` (`None`: the original image).
+    pub saved_doc: Option<String>,
 }
 
 #[derive(Default)]
@@ -197,6 +199,7 @@ fn open_now(app: &tauri::AppHandle, id: &str) -> KResult<()> {
         width,
         height,
         title: title.clone(),
+        saved_doc: entry.as_ref().and_then(|e| e.saved_doc.clone()),
         saved_path: entry.and_then(|e| e.saved_path),
         document,
     };
@@ -281,6 +284,7 @@ pub fn export(
     png: Vec<u8>,
     current: Option<std::path::PathBuf>,
     name: Option<String>,
+    doc_hash: Option<String>,
 ) -> KResult<ExportResult> {
     let invalid = |e: &dyn std::fmt::Display| {
         KirishotError::new(
@@ -336,7 +340,12 @@ pub fn export(
     }
     // The history follows: where it was saved, that it was copied, and the annotated image.
     if let Some(path) = &result.saved {
-        crate::history::mark_saved(app, capture_id, std::path::Path::new(path));
+        crate::history::mark_saved_doc(
+            app,
+            capture_id,
+            std::path::Path::new(path),
+            doc_hash.as_deref(),
+        );
     }
     if result.copied {
         crate::history::mark_copied(app, capture_id);

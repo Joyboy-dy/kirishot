@@ -181,7 +181,9 @@ fn ensure_hook(app: &tauri::AppHandle) {
     let handle = app.clone();
     // Keys without a binding (Alt+PrintScreen, Win+E…) keep their Windows behavior.
     let installed = ll_hook::install_hook(move |pressed| {
-        if RECORDING.load(Ordering::SeqCst) {
+        // Only keys typed in Kirishot are recorded: a combination typed in another application
+        // goes to it, never to a new global shortcut.
+        if RECORDING.load(Ordering::SeqCst) && raw_keys::kirishot_in_front() {
             let accel = match record::recorded(pressed) {
                 // A modifier goes through: Windows must see it held.
                 record::Recorded::Wait => return false,

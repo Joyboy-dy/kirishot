@@ -50,6 +50,10 @@ pub struct HistoryEntry {
     pub annotated: bool,
     /// Bytes used in the history folder.
     pub bytes: f64,
+    /// The fingerprint of the editor document last saved to `saved_path`; `None` when the file
+    /// holds the original image (saved by the thumbnail) — spec J3 § 3.2.
+    #[serde(default)]
+    pub saved_doc: Option<String>,
 }
 
 /// The entries, newest first.
@@ -101,17 +105,33 @@ impl Index {
                 Index::rebuild(dir)
             }
             Ok(bytes) => match serde_json::from_slice::<Vec<HistoryEntry>>(&bytes) {
-                Ok(entries) => {
-                    let mut index = Index { entries };
-                    index.sort();
-                    index
-                }
+                Ok(entries) => Index { entries }.matched_to(dir),
                 Err(e) => {
                     log::warn!("history index invalid ({e}), rebuilt");
                     Index::rebuild(dir)
                 }
             },
         }
+    }
+
+    /// The index made true to the folders: entries whose original image is gone are dropped
+    /// (folder deleted, or never written because the app was killed), folders it does not list
+    /// are added. What it knew about the others is kept.
+    fn matched_to(self, dir: &Path) -> Index {
+        let on_disk = Index::rebuild(dir);
+        let mut entries: Vec<HistoryEntry> = self
+            .entries
+            .into_iter()
+            .filter(|e| on_disk.entries.iter().any(|d| d.id == e.id))
+            .collect();
+        for found in on_disk.entries {
+            if !entries.iter().any(|e| e.id == found.id) {
+                entries.push(found);
+            }
+        }
+        let mut index = Index { entries };
+        index.sort();
+        index
     }
 
     pub fn save(&self, dir: &Path) -> KResult<()> {
@@ -194,6 +214,7 @@ impl Index {
                 copied: false,
                 annotated: folder.join(DOCUMENT_FILE).exists(),
                 bytes: folder_bytes(&folder) as f64,
+                saved_doc: None,
             });
         }
         let mut index = Index { entries };
@@ -246,6 +267,7 @@ mod tests {
             copied: false,
             annotated: false,
             bytes: 10.0,
+            saved_doc: None,
         }
     }
 
@@ -256,8 +278,12 @@ mod tests {
     #[test]
     fn index_roundtrips_atomically() {
         let dir = tempfile::tempdir().unwrap();
+        let id = "01JBX4Q8Z3M6N2P7R9S5T1V0W8";
+        write_capture(dir.path(), id, &png(4, 3), b"jpg").unwrap();
         let mut index = Index::default();
-        index.upsert(entry("01JBX4Q8Z3M6N2P7R9S5T1V0W8", Local::now()));
+        let mut e = entry(id, Local::now());
+        e.size = ImageSize { w: 4, h: 3 };
+        index.upsert(e);
         index.save(dir.path()).unwrap();
         assert_eq!(Index::load(dir.path()), index);
         let leftovers: Vec<_> = std::fs::read_dir(dir.path())
@@ -309,6 +335,28 @@ mod tests {
         assert_eq!(ids, [newer, older]);
         assert_eq!(index.entries[0].size, ImageSize { w: 4, h: 3 });
         assert!(index.entries[0].bytes > 0.0);
+    }
+
+    #[test]
+    fn a_valid_index_is_matched_to_the_folders() {
+        let dir = tempfile::tempdir().unwrap();
+        let kept = ulid::Ulid::from_parts(1_700_000_000_000, 1).to_string();
+        let gone = ulid::Ulid::from_parts(1_750_000_000_000, 1).to_string();
+        let orphan = ulid::Ulid::from_parts(1_800_000_000_000, 1).to_string();
+        write_capture(dir.path(), &kept, &png(4, 3), b"jpg").unwrap();
+        write_capture(dir.path(), &orphan, &png(4, 3), b"jpg").unwrap();
+        let mut index = Index::default();
+        let mut e = entry(&kept, Local::now());
+        e.copied = true;
+        index.upsert(e);
+        // Its folder was deleted (or never written: the app was killed).
+        index.upsert(entry(&gone, Local::now()));
+        index.save(dir.path()).unwrap();
+        let loaded = Index::load(dir.path());
+        let ids: Vec<_> = loaded.entries.iter().map(|e| e.id.clone()).collect();
+        assert!(ids.contains(&kept) && ids.contains(&orphan) && !ids.contains(&gone));
+        // What the index knew about a capture is kept.
+        assert!(loaded.entries.iter().find(|e| e.id == kept).unwrap().copied);
     }
 
     #[test]
