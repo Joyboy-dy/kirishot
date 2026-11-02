@@ -213,6 +213,28 @@ pub async fn editor_export(
     .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))?
 }
 
+/// The page let the next capture into the editor (spec J3 § 3.5).
+#[tauri::command]
+#[specta::specta]
+pub async fn editor_open_next(app: tauri::AppHandle, next_id: String) -> KResult<()> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(editor::open_next(&handle, &next_id));
+    })
+    .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?;
+    rx.recv()
+        .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?
+}
+
+/// The page kept its capture: the one that asked is released.
+#[tauri::command]
+#[specta::specta]
+pub async fn editor_cancel_next(app: tauri::AppHandle, next_id: String) -> KResult<()> {
+    editor::cancel_next(&app, &next_id);
+    Ok(())
+}
+
 /// The file name a first save would use: the template's, with the settings' extension.
 #[tauri::command]
 #[specta::specta]
@@ -549,6 +571,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             editor_autosave,
             play_shutter_preview,
             editor_planned_name,
+            editor_open_next,
+            editor_cancel_next,
             editor_rename,
             history_list,
             history_thumb_path,
@@ -564,7 +588,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             OverlayReset,
             ThumbnailPushed,
             ThumbnailUpdate,
-            crate::history::HistoryChanged
+            crate::history::HistoryChanged,
+            editor::EditorCloseRequested
         ])
         // Used by the overlay before any command carries them.
         .typ::<Rect>()

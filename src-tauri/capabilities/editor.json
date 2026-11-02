@@ -13,6 +13,9 @@
     "allow-editor-autosave",
     "allow-settings-get",
     "allow-editor-planned-name",
-    "allow-editor-rename"
+    "allow-editor-rename",
+    "allow-editor-open-next",
+    "allow-editor-cancel-next",
+    "allow-settings-update"
   ]
 }

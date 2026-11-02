@@ -46,6 +46,10 @@ export const commands = {
 	playShutterPreview: () => typedError<null, KirishotError>(__TAURI_INVOKE("play_shutter_preview")),
 	/**  The file name a first save would use: the template's, with the settings' extension. */
 	editorPlannedName: (captureId: string) => typedError<string, KirishotError>(__TAURI_INVOKE("editor_planned_name", { captureId })),
+	/**  The page let the next capture into the editor (spec J3 § 3.5). */
+	editorOpenNext: (nextId: string) => typedError<null, KirishotError>(__TAURI_INVOKE("editor_open_next", { nextId })),
+	/**  The page kept its capture: the one that asked is released. */
+	editorCancelNext: (nextId: string) => typedError<null, KirishotError>(__TAURI_INVOKE("editor_cancel_next", { nextId })),
 	/**
 	 *  Renames the capture's file (spec J3 § 3.3). Without a file yet, only checks the name, which
 	 *  the page keeps for the first save. Returns the new path, if a file was renamed.
@@ -69,6 +73,7 @@ export const commands = {
 
 /** Events */
 export const events = {
+	editorCloseRequested: makeEvent<EditorCloseRequested, EditorCloseRequested>("editor-close-requested"),
 	historyChanged: makeEvent<HistoryChanged, HistoryChanged>("history-changed"),
 	overlayClaimed: makeEvent<OverlayClaimed, OverlayClaimed>("overlay-claimed"),
 	overlayReset: makeEvent<OverlayReset, OverlayReset>("overlay-reset"),
@@ -110,8 +115,19 @@ export type CaptureSettings = {
 	startMode: StartModeSetting,
 };
 
+/**  Why the editor is about to close: the page checks for unsaved changes first (spec J3 § 3.5). */
+export type CloseReason = 
+/**  The window's ×, Alt+F4. */
+{ kind: "window" } | 
+/**  Another capture asks for the editor. */
+{ kind: "replace"; nextId: string };
+
 /**  What the selection overlay asks Rust to capture. */
 export type CommitTarget = { kind: "region"; rect: Rect } | { kind: "window"; index: number } | { kind: "monitor" };
+
+export type EditorCloseRequested = {
+	reason: CloseReason,
+};
 
 /**  What the editor page needs besides the pixels; sent as the shared buffer's additionalData. */
 export type EditorSession = {

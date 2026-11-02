@@ -18,7 +18,8 @@ import {
 } from '@/editor/document';
 import { commit, init, preview, redo, settle, undo, type History } from '@/editor/history';
 import { PALETTE, strokeWidth } from '@/editor/style';
-import { commands } from '@/lib/ipc';
+import { commands, events, type CloseReason } from '@/lib/ipc';
+import { NO_CHANGE } from '@/lib/settings';
 import { t } from '@/i18n';
 import { Canvas, type CanvasPointer } from './Canvas';
 import { useAutosave } from './autosave';
@@ -26,6 +27,8 @@ import { exportImage, type ExportIntent } from './export';
 import { buttonView, closeAfterCopy, FEEDBACK, messageVisible, type ButtonState } from './feedback';
 import { keyAction, type EditorAction } from './keys';
 import { saveState, type SaveState } from './save';
+import { afterChoice, closeDecision, hasUnsavedChanges, type CloseChoice } from './closing';
+import { CloseDialog } from './CloseDialog';
 import { baseName, splitName } from './fileName';
 import { NameField } from './NameField';
 import { toolbarLayout } from './layout';
@@ -109,6 +112,13 @@ export function Editor() {
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const [savedDoc, setSavedDoc] = useState<Doc | null>(null);
   const [pendingName, setPendingName] = useState<string | null>(null);
+  // The document the capture opened with: a never-saved capture with no change closes quietly.
+  const [openedDoc, setOpenedDoc] = useState<Doc | null>(null);
+  // Closing with unsaved changes (spec J3 § 3.5): the pending reason, a save in progress, its error.
+  const [closing, setClosing] = useState<CloseReason | null>(null);
+  const [closeBusy, setCloseBusy] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
+  const [confirmClose, setConfirmClose] = useState(true);
   // The name a first save would use, from the template; and the rename field being open.
   const [plannedName, setPlannedName] = useState('');
   const [renaming, setRenaming] = useState(false);
@@ -126,6 +136,8 @@ export function Editor() {
     setSavedPath(knownPath);
     setSavedDoc(knownPath ? opened : null);
     setPendingName(null);
+    setOpenedDoc(opened);
+    setClosing(null);
     setRenaming(false);
     setPlannedName('');
     setMessage(null);
@@ -163,6 +175,7 @@ export function Editor() {
   useAutosave(doc);
   const image = doc ? doc.size : { w: 1, h: 1 };
   const record = (next: Doc) => setHistory((h) => h && commit(h, next));
+
   const currentSave: SaveState = doc ? saveState(doc, savedDoc, savedPath) : 'never';
   // The saved file's name, or the one the first save will use (spec J3 § 3.3).
   const shownName = savedPath
@@ -205,8 +218,9 @@ export function Editor() {
   }, [ticking]);
 
   // The result shows on the button used (a check) and in the status bar (spec J2.1 § 4.2).
-  const runExport = (intent: ExportIntent) => {
-    if (!doc || !stage || busy) return;
+  // Resolves to `null` once done, or to the error (a cancelled « Enregistrer sous » is one).
+  const runExport = (intent: ExportIntent): Promise<string | null> => {
+    if (!doc || !stage || busy) return Promise.resolve(t('editor.busy'));
     const key: ExportButton =
       intent === 'copy' ? 'copy' : intent === 'copyAndClose' ? 'main' : 'save';
     const mark = (phase: ButtonState['phase']) =>
@@ -221,14 +235,17 @@ export function Editor() {
     // Copy and close: copy, show the check, then close (closing at once would hide it).
     const exportedId = doc.captureId;
     const exportedDoc = doc;
-    exportImage(stage, doc, intent === 'copyAndClose' ? 'copy' : intent, {
+    return exportImage(stage, doc, intent === 'copyAndClose' ? 'copy' : intent, {
       path: savedPath,
       name: pendingName,
     })
       .then((r) => {
         // Another capture arrived meanwhile: this result is not about what is shown.
-        if (!closeAfterCopy(exportedId, shownRef.current)) return;
-        if (r.cancelled) return mark('idle');
+        if (!closeAfterCopy(exportedId, shownRef.current)) return t('editor.busy');
+        if (r.cancelled) {
+          mark('idle');
+          return t('editor.cancelled');
+        }
         mark('done');
         if (r.saved) {
           setSavedPath(r.saved);
@@ -246,19 +263,72 @@ export function Editor() {
           window.setTimeout(() => {
             if (closeAfterCopy(exportedId, shownRef.current)) void commands.editorClose();
           }, FEEDBACK.closeDelayMs);
+        return null;
       })
       .catch((e: unknown) => {
         mark('idle');
         const text =
           e instanceof Error ? e.message : ((e as { message?: string }).message ?? String(e));
-        setMessage({
-          text: t('editor.exportFailed', { message: text }),
-          error: true,
-          at: Date.now(),
-        });
+        const failed = t('editor.exportFailed', { message: text });
+        setMessage({ text: failed, error: true, at: Date.now() });
+        return failed;
       })
       .finally(() => setBusy(false));
   };
+
+  // The setting « Demander avant de fermer », kept in sync with the settings page.
+  useEffect(() => {
+    void commands.settingsGet().then((r) => {
+      if (r.status === 'ok') setConfirmClose(r.data.settings.editor.confirmClose);
+    });
+    const unlisten = events.settingsChanged.listen((e) =>
+      setConfirmClose(e.payload.settings.editor.confirmClose),
+    );
+    return () => void unlisten.then((stop) => stop());
+  }, []);
+
+  // What the close does once the capture may go: hide the editor, or let the next capture in.
+  const proceedClose = (reason: CloseReason) => {
+    setClosing(null);
+    setCloseError(null);
+    if (reason.kind === 'replace') void commands.editorOpenNext(reason.nextId);
+    else void commands.editorClose();
+  };
+  const requestClose = (reason: CloseReason) => {
+    const unsaved = doc && openedDoc ? hasUnsavedChanges(currentSave, doc, openedDoc) : false;
+    if (closeDecision(unsaved, confirmClose) === 'close') return proceedClose(reason);
+    setCloseError(null);
+    setClosing(reason);
+  };
+  const chooseClose = async (choice: CloseChoice, dontAsk: boolean) => {
+    const reason = closing;
+    if (!reason) return;
+    const plan = afterChoice(choice, dontAsk);
+    if (!plan.close) {
+      setClosing(null);
+      if (reason.kind === 'replace') void commands.editorCancelNext(reason.nextId);
+      return;
+    }
+    if (plan.disableConfirm) void commands.settingsUpdate({ ...NO_CHANGE, confirmClose: false });
+    if (plan.save) {
+      setCloseBusy(true);
+      const failed = await runExport('save');
+      setCloseBusy(false);
+      if (failed) return setCloseError(failed);
+    }
+    proceedClose(reason);
+  };
+  const requestCloseRef = useRef(requestClose);
+  useLayoutEffect(() => {
+    requestCloseRef.current = requestClose;
+  });
+  // Rust asks before the window closes or another capture replaces this one.
+  useEffect(() => {
+    const unlisten = events.editorCloseRequested.listen((e) =>
+      requestCloseRef.current(e.payload.reason),
+    );
+    return () => void unlisten.then((stop) => stop());
+  }, []);
 
   const changeTool = (next: ToolId) => {
     setTool(next);
@@ -320,7 +390,7 @@ export function Editor() {
       case 'escape':
         if (cropDraft) return changeTool('select');
         if (selected.length > 0) return setSelected([]);
-        return void commands.editorClose();
+        return requestClose({ kind: 'window' });
       case 'rename':
         return setRenaming(true);
       case 'front':
@@ -332,11 +402,11 @@ export function Editor() {
       case 'save':
         // Nothing changed since the last save: no second identical file (spec J3 § 3.2).
         if (currentSave === 'clean') return;
-        return runExport('save');
+        return void runExport('save');
       case 'copy':
       case 'saveAs':
       case 'copyAndClose':
-        return runExport(action.type);
+        return void runExport(action.type);
     }
   };
 
@@ -605,6 +675,13 @@ export function Editor() {
                 {!cropDraft && doc.crop && <CropShade crop={doc.crop} image={image} />}
               </>
             }
+          />
+        )}
+        {closing && (
+          <CloseDialog
+            busy={closeBusy}
+            error={closeError}
+            onChoice={(choice, dontAsk) => void chooseClose(choice, dontAsk)}
           />
         )}
         {editing && (

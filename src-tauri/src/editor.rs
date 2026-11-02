@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::window::Color;
 use tauri::{Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri_specta::Event;
 
 use crate::error::{ErrorCode, KResult, KirishotError};
 use crate::frame;
@@ -40,6 +41,28 @@ struct Inner {
 
 #[derive(Default)]
 pub struct EditorState(Mutex<Inner>);
+
+/// Why the editor is about to close: the page checks for unsaved changes first (spec J3 § 3.5).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum CloseReason {
+    /// The window's ×, Alt+F4.
+    Window,
+    /// Another capture asks for the editor.
+    #[serde(rename_all = "camelCase")]
+    Replace { next_id: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
+pub struct EditorCloseRequested {
+    pub reason: CloseReason,
+}
+
+/// Whether a capture asking for the editor must first ask the page: only when another capture
+/// is shown in a loaded, visible editor.
+pub fn must_ask(current: Option<&str>, next: &str, loaded: bool, visible: bool) -> bool {
+    loaded && visible && current.is_some_and(|c| c != next)
+}
 
 /// Logical size of the editor window for a work area of `work` logical pixels.
 pub fn window_size(work: (u32, u32)) -> (u32, u32) {
@@ -80,19 +103,72 @@ pub fn create(app: &tauri::AppHandle) -> KResult<()> {
         .background_color(BACKGROUND)
         .build()
         .map_err(window_error)?;
-    // Closing hides the window: it is reused, and its capture is released.
+    // Closing hides the window (it is reused) once the page has checked for unsaved changes; a
+    // page that is not loaded cannot answer, so the window just closes.
     let handle = app.clone();
     window.on_window_event(move |event| {
         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
             api.prevent_close();
-            close(&handle);
+            let loaded = handle.state::<EditorState>().0.lock().unwrap().loaded;
+            let asked = loaded
+                && EditorCloseRequested {
+                    reason: CloseReason::Window,
+                }
+                .emit(&handle)
+                .is_ok();
+            if !asked {
+                close(&handle);
+            }
         }
     });
     Ok(())
 }
 
-/// Opens capture `id` in the editor; its automatic action will not run any more.
+/// Opens capture `id` in the editor; its automatic action will not run any more. When the
+/// editor shows another capture, the page is asked first (`EditorCloseRequested`): it answers
+/// with `open_next` or `cancel_next`.
 pub fn open(app: &tauri::AppHandle, id: &str) -> KResult<()> {
+    let window = editor_window(app)?;
+    let ask = {
+        let state = app.state::<EditorState>();
+        let inner = state.0.lock().unwrap();
+        must_ask(
+            inner.current.as_deref(),
+            id,
+            inner.loaded,
+            window.is_visible().unwrap_or(false),
+        )
+    };
+    if ask {
+        // The capture stays out of its automatic action while the page decides.
+        app.state::<ShotStore>().begin_edit(id);
+        EditorCloseRequested {
+            reason: CloseReason::Replace {
+                next_id: id.to_string(),
+            },
+        }
+        .emit(app)
+        .map_err(window_error)?;
+        let _ = window.unminimize();
+        return window.set_focus().map_err(window_error);
+    }
+    open_now(app, id)
+}
+
+/// The page let the next capture in (after saving or discarding the shown one).
+pub fn open_next(app: &tauri::AppHandle, id: &str) -> KResult<()> {
+    open_now(app, id)
+}
+
+/// The page kept the shown capture: the one that asked is released (it is in the history).
+pub fn cancel_next(app: &tauri::AppHandle, id: &str) {
+    let current = app.state::<EditorState>().0.lock().unwrap().current.clone();
+    if current.as_deref() != Some(id) {
+        release(app, id);
+    }
+}
+
+fn open_now(app: &tauri::AppHandle, id: &str) -> KResult<()> {
     let shots = app.state::<ShotStore>();
     if !shots.begin_edit(id) {
         return Err(KirishotError::new(
@@ -557,6 +633,15 @@ mod tests {
             parse_intent(Some("saveVersion")).unwrap(),
             ExportIntent::SaveVersion
         );
+    }
+
+    #[test]
+    fn another_capture_asks_only_a_visible_loaded_editor() {
+        assert!(must_ask(Some("a"), "b", true, true));
+        assert!(!must_ask(Some("a"), "a", true, true));
+        assert!(!must_ask(None, "b", true, true));
+        assert!(!must_ask(Some("a"), "b", false, true));
+        assert!(!must_ask(Some("a"), "b", true, false));
     }
 
     #[test]

@@ -34,6 +34,8 @@ fn main() {
                 "editor_autosave",
                 "play_shutter_preview",
                 "editor_planned_name",
+                "editor_open_next",
+                "editor_cancel_next",
                 "editor_rename",
                 "history_list",
                 "history_thumb_path",
