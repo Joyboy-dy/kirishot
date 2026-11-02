@@ -24,6 +24,7 @@ import { useAutosave } from './autosave';
 import { ContextBubble } from './ContextBubble';
 import { exportImage, type ExportIntent } from './export';
 import { keyAction, type EditorAction } from './keys';
+import { toolbarLayout } from './layout';
 import { StatusBar } from './StatusBar';
 import type { Style } from './StylePopover';
 import { TopBar } from './TopBar';
@@ -354,7 +355,8 @@ export function Editor() {
 
   return (
     <div
-      className="flex h-screen flex-col"
+      // The page never scrolls: only the image area pans and zooms (spec J2.1 § 4.1).
+      className="flex h-screen w-screen flex-col overflow-hidden"
       style={{ background: 'var(--k-bg)', color: 'var(--k-text)' }}
     >
       <TopBar
@@ -476,6 +478,7 @@ export function Editor() {
         width={doc?.crop?.width ?? doc?.size.w ?? 0}
         height={doc?.crop?.height ?? doc?.size.h ?? 0}
         annotations={doc?.annotations.length ?? 0}
+        compact={toolbarLayout(box.width) === 'narrow'}
         zoom={view.scale}
         message={message}
         onZoomIn={() => zoomBy(1.25)}

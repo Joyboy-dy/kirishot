@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
+import { Popover } from 'radix-ui';
 import { Tip } from '@/components/ui/Tip';
 import type { Block, Fill, Stroke, TextStyle } from '@/editor/document';
 import { PALETTE, type SizeStep } from '@/editor/style';
@@ -237,5 +239,86 @@ export function StyleControls({ options, value, onChange, withoutColor }: Contro
         </span>
       ))}
     </>
+  );
+}
+
+const MENU_STYLE = {
+  background: 'var(--k-glass)',
+  backdropFilter: 'blur(16px)',
+  border: '1px solid var(--k-border)',
+  boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
+  color: 'var(--k-text)',
+};
+
+/** A small menu under its trigger, kept inside the window. */
+function Menu(p: { trigger: ReactNode; label: string; children: ReactNode }) {
+  return (
+    <Popover.Root>
+      <Tip label={p.label}>
+        <Popover.Trigger asChild>{p.trigger}</Popover.Trigger>
+      </Tip>
+      <Popover.Portal>
+        <Popover.Content
+          side="bottom"
+          align="center"
+          sideOffset={8}
+          collisionPadding={8}
+          aria-label={p.label}
+          className="z-50 flex max-w-[min(360px,calc(100vw-16px))] flex-wrap items-center gap-1 rounded-xl p-2"
+          style={MENU_STYLE}
+        >
+          {p.children}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+/** The colour as one swatch; the palette opens under it (spec J2.1 § 4.1, compact layout). */
+export function ColorMenu(p: { value?: string; onChange(color: string): void }) {
+  return (
+    <Menu
+      label={t('editor.colorMenu')}
+      trigger={
+        <button
+          type="button"
+          aria-label={t('editor.colorMenu')}
+          className="k-press h-6 w-6 shrink-0 rounded-full border-0 p-0"
+          style={{
+            background: p.value ?? 'transparent',
+            boxShadow: '0 0 0 2px var(--k-surface), 0 0 0 3px var(--k-border)',
+          }}
+        />
+      }
+    >
+      <Palette value={p.value} onChange={p.onChange} />
+    </Menu>
+  );
+}
+
+/** The settings behind one « Style » button (spec J2.1 § 4.1, compact and narrow layouts). */
+export function StyleMenu(p: ControlsProps & { iconOnly?: boolean }) {
+  return (
+    <Menu
+      label={t('editor.style')}
+      trigger={
+        <button
+          type="button"
+          aria-label={t('editor.style')}
+          className="k-press flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border-0 bg-transparent px-2 text-[13px] hover:bg-white/10"
+          style={{ color: 'var(--k-text)' }}
+        >
+          <SlidersHorizontal size={16} strokeWidth={1.9} />
+          {!p.iconOnly && t('editor.style')}
+        </button>
+      }
+    >
+      <StyleControls
+        options={p.options}
+        value={p.value}
+        onChange={p.onChange}
+        withoutColor={p.withoutColor}
+      />
+    </Menu>
   );
 }

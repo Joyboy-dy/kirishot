@@ -71,7 +71,7 @@ pub fn create(app: &tauri::AppHandle) -> KResult<()> {
         .title("Kirishot")
         .visible(false)
         .inner_size(width as f64, height as f64)
-        .min_inner_size(900.0, 600.0)
+        .min_inner_size(520.0, 400.0)
         .center()
         .background_color(BACKGROUND)
         .build()

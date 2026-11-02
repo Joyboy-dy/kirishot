@@ -6,6 +6,8 @@ type Props = {
   width: number;
   height: number;
   annotations: number;
+  /** Below 760 px the annotation count is left out (spec J2.1 § 4.1). */
+  compact: boolean;
   zoom: number;
   message: { text: string; error: boolean } | null;
   onZoomIn(): void;
@@ -17,22 +19,22 @@ type Props = {
 export function StatusBar(p: Props) {
   return (
     <footer
-      className="flex h-9 shrink-0 items-center gap-4 px-4 text-[12.5px]"
+      className="flex h-9 shrink-0 items-center gap-4 whitespace-nowrap px-4 text-[12.5px]"
       style={{ borderTop: '1px solid var(--k-border)', color: 'var(--k-text-2)' }}
     >
       <span className="font-mono">
         {p.width} × {p.height}
       </span>
-      <span>{t('editor.annotations', { n: p.annotations })}</span>
+      {!p.compact && <span>{t('editor.annotations', { n: p.annotations })}</span>}
       <span
         role="status"
         aria-live="polite"
-        className="flex-1 truncate"
+        className="min-w-0 flex-1 truncate"
         style={{ color: p.message?.error ? 'var(--k-danger)' : 'var(--k-text-2)' }}
       >
         {p.message?.text}
       </span>
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <Tip label={t('editor.zoomOut')} keys={['Ctrl', '−']} side="top">
           <button
             type="button"
