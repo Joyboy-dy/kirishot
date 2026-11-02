@@ -120,10 +120,11 @@ export function stepNumber(d: Doc, id: string): number {
 
 export function setCrop(d: Doc, crop: Rect | null): Doc {
   if (!crop) return { ...d, crop: null };
-  const x = Math.max(0, crop.x);
-  const y = Math.max(0, crop.y);
-  const right = Math.min(d.size.w, crop.x + crop.width);
-  const bottom = Math.min(d.size.h, crop.y + crop.height);
+  // Whole pixels: the export copies pixels one to one, never resampling.
+  const x = Math.max(0, Math.round(crop.x));
+  const y = Math.max(0, Math.round(crop.y));
+  const right = Math.min(d.size.w, Math.round(crop.x + crop.width));
+  const bottom = Math.min(d.size.h, Math.round(crop.y + crop.height));
   return {
     ...d,
     crop: { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) },

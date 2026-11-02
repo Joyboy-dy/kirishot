@@ -32,6 +32,14 @@ pub struct ShotView {
     pub state: ShotState,
 }
 
+/// What an expiry hands over: the action to run and what it needs, taken under the same lock,
+/// so a close right after cannot leave the action without its image.
+pub struct Expired {
+    pub action: AutoAction,
+    pub image: Arc<RgbaImage>,
+    pub meta: CaptureMeta,
+}
+
 #[derive(Default)]
 pub struct ShotStore {
     shots: Mutex<HashMap<String, Shot>>,
@@ -61,15 +69,19 @@ impl ShotStore {
         })
     }
 
-    /// Pending → Delivered: returns the action to run, once. Any other state gives `None`.
-    pub fn expire(&self, id: &str) -> Option<AutoAction> {
+    /// Pending → Delivered: hands over the action to run, once. Any other state gives `None`.
+    pub fn expire(&self, id: &str) -> Option<Expired> {
         let mut shots = self.shots.lock().unwrap();
         let shot = shots.get_mut(id)?;
         if shot.state != ShotState::Pending {
             return None;
         }
         shot.state = ShotState::Delivered;
-        Some(shot.action)
+        Some(Expired {
+            action: shot.action,
+            image: shot.image.clone(),
+            meta: shot.meta.clone(),
+        })
     }
 
     /// Pending or Delivered → Editing; `false` when the shot is gone.
@@ -135,8 +147,11 @@ mod tests {
     #[test]
     fn expire_runs_once() {
         let (store, id) = store_with_one();
-        assert_eq!(store.expire(&id), Some(AutoAction::SaveAndCopy));
-        assert_eq!(store.expire(&id), None);
+        assert_eq!(
+            store.expire(&id).map(|e| e.action),
+            Some(AutoAction::SaveAndCopy)
+        );
+        assert!(store.expire(&id).is_none());
         assert_eq!(store.get(&id).unwrap().state, ShotState::Delivered);
     }
 
@@ -144,7 +159,17 @@ mod tests {
     fn editing_cancels_the_automatic_action() {
         let (store, id) = store_with_one();
         assert!(store.begin_edit(&id));
-        assert_eq!(store.expire(&id), None);
+        assert!(store.expire(&id).is_none());
+    }
+
+    #[test]
+    fn expire_hands_over_the_image_even_if_the_shot_is_released_next() {
+        let (store, id) = store_with_one();
+        let expired = store.expire(&id).unwrap();
+        store.release(&id);
+        assert!(store.get(&id).is_none());
+        assert_eq!(expired.image.dimensions(), (4, 3));
+        assert_eq!(expired.action, AutoAction::SaveAndCopy);
     }
 
     #[test]

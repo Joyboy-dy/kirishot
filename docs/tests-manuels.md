@@ -58,15 +58,15 @@
 30. Tape du texte dans le Bloc-notes, fais une capture, survole puis clique les boutons de la vignette : la frappe suivante va toujours dans le Bloc-notes (la vignette ne prend jamais le focus).
 31. La vignette apparaît en bas à droite de l'écran de la capture, au-dessus de la barre des tâches, avec « Copiée · enregistrement dans N s ». Ctrl+V colle l'image tout de suite.
 32. Le survol met le compte à rebours en pause. À la fin, la capture est enregistrée une seule fois, puis la vignette part.
-33. Copier, Enregistrer, Modifier et × fonctionnent ; × sur une vignette en attente enregistre quand même la capture (si l'action le demande).
+33. Copier, Enregistrer, Modifier et × fonctionnent ; × ferme sans enregistrer (la capture reste dans le presse-papiers si l'action copie). Enregistrer juste après l'enregistrement automatique ne crée pas de second fichier.
 34. Clic droit : Ouvrir le dossier et Copier le chemin après l'enregistrement, Supprimer jette la capture et son fichier.
-35. Quatre captures rapides : trois vignettes et « +1 » ; la quatrième entre quand une part. Une capture sur l'autre écran déplace la pile.
+35. Quatre captures rapides : trois vignettes et « +1 » ; la quatrième entre quand une part. Une capture sur l'autre écran déplace la pile, à la bonne taille même si les deux écrans n'ont pas la même échelle (100 % et 150 %).
 36. Glisser une vignette dans Discord, un mail et l'Explorateur dépose le fichier PNG. Pendant le glisser, la zone de notification et les raccourcis répondent.
 37. « Afficher la vignette » désactivé : retour au comportement de J1 (action immédiate et notification).
 
 ### Éditeur
 
-38. Un clic sur une vignette ouvre l'éditeur en moins d'une demi-seconde, l'image ajustée à la fenêtre ; « Toujours ouvrir l'éditeur » saute la vignette.
+38. Un clic sur une vignette ouvre l'éditeur, sans enregistrer de fichier, en moins d'une demi-seconde, l'image ajustée à la fenêtre ; « Toujours ouvrir l'éditeur » saute la vignette.
 39. Chaque outil (Flèche, Rectangle, Ellipse, Ligne, Crayon, Surligneur, Texte, Étapes, Masquer, Recadrer) dessine, se sélectionne, se déplace, se restyle depuis la barre et s'annule avec Ctrl+Z.
 40. La flèche se courbe avec la poignée orange du milieu ; Maj aligne flèches et lignes par pas de 15°.
 41. Le surligneur assombrit le texte sans le cacher. Masquer rend un texte illisible.
@@ -80,3 +80,4 @@
 ### Réglages › Capture
 
 48. Chaque interrupteur (loupe, son, flash, vignette, toujours ouvrir l'éditeur) et la durée de la vignette sont gardés après un redémarrage. Activer le son joue le clic.
+49. Après Win+L ou Ctrl+Alt+Suppr, retour sur la session, éditeur ouvert : Win + Maj + S lance toujours une capture, et Maj+S tapé dans un texte n'en lance pas.

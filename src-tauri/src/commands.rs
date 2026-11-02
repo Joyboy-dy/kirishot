@@ -112,6 +112,13 @@ pub async fn thumbnail_save(app: tauri::AppHandle, id: String) -> KResult<()> {
 #[tauri::command]
 #[specta::specta]
 pub async fn thumbnail_edit(app: tauri::AppHandle, id: String) -> KResult<()> {
+    // Editing from now on: the card's close, sent right after, can no longer save it.
+    if !app.state::<crate::shots::ShotStore>().begin_edit(&id) {
+        return Err(KirishotError::new(
+            ErrorCode::NoActiveCapture,
+            "Capture introuvable",
+        ));
+    }
     let (tx, rx) = std::sync::mpsc::channel();
     let handle = app.clone();
     app.run_on_main_thread(move || {

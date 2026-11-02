@@ -2,8 +2,6 @@
 //! hook at all (spike J2, `docs/spike-latence.md`), and the shell opens its Snipping Tool.
 //! Raw input with `RIDEV_NOHOTKEYS` still sees the keys and turns off other applications'
 //! hotkeys while Kirishot is in front, so the shortcut reaches Kirishot instead.
-use std::sync::Mutex;
-
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::{
@@ -18,24 +16,16 @@ use windows::core::w;
 
 use super::ll_hook::{self, HookKey, Mods};
 
-/// The modifiers held after a raw key event.
-pub(crate) fn track_mods(mut mods: Mods, vk: u32, down: bool) -> Mods {
-    match vk {
-        0x10 | 0xA0 | 0xA1 => mods.shift = down,
-        0x11 | 0xA2 | 0xA3 => mods.ctrl = down,
-        0x12 | 0xA4 | 0xA5 => mods.alt = down,
-        0x5B | 0x5C => mods.win = down,
-        _ => {}
+/// The modifiers held right now, read through `held` at each key: a key-up lost on the secure
+/// desktop (Ctrl+Alt+Suppr, Win+L) can never leave one stuck.
+pub(crate) fn mods_from(held: impl Fn(u16) -> bool) -> Mods {
+    Mods {
+        shift: held(0x10),
+        ctrl: held(0x11),
+        alt: held(0x12),
+        win: held(0x5B) || held(0x5C),
     }
-    mods
 }
-
-static MODS: Mutex<Mods> = Mutex::new(Mods {
-    shift: false,
-    ctrl: false,
-    alt: false,
-    win: false,
-});
 
 fn kirishot_in_front() -> bool {
     let mut pid = 0u32;
@@ -64,15 +54,13 @@ unsafe extern "system" fn window_proc(
         if read != u32::MAX && raw.header.dwType == RIM_TYPEKEYBOARD.0 {
             let keyboard = unsafe { raw.data.keyboard };
             let down = matches!(keyboard.Message, WM_KEYDOWN | WM_SYSKEYDOWN);
-            let vk = keyboard.VKey as u32;
-            let mods = {
-                let mut held = MODS.lock().unwrap();
-                *held = track_mods(*held, vk, down);
-                *held
-            };
             // Elsewhere the low-level hook sees the key and handles it.
             if down && kirishot_in_front() {
-                ll_hook::press(HookKey { vk, mods });
+                let vk = keyboard.VKey as u32;
+                ll_hook::press(HookKey {
+                    vk,
+                    mods: mods_from(ll_hook::held),
+                });
             }
         }
     }
@@ -121,51 +109,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn modifiers_follow_presses_and_releases() {
-        let m = track_mods(Mods::default(), 0x5B, true);
-        let m = track_mods(m, 0xA0, true);
+    fn modifiers_come_from_the_live_key_state() {
+        // A key-up lost on the secure desktop (Ctrl+Alt+Suppr, Win+L) must not leave a
+        // modifier stuck: the state is read at each key, never accumulated.
+        let held = |vk: u16| matches!(vk, 0x10 | 0x5B);
         assert_eq!(
-            m,
+            mods_from(held),
             Mods {
-                win: true,
                 shift: true,
-                ..Mods::default()
-            }
-        );
-        let m = track_mods(m, 0xA0, false);
-        assert_eq!(
-            m,
-            Mods {
                 win: true,
                 ..Mods::default()
             }
         );
-    }
-
-    #[test]
-    fn both_sides_and_generic_codes_count() {
-        for vk in [0x10, 0xA0, 0xA1] {
-            assert!(track_mods(Mods::default(), vk, true).shift);
-        }
-        for vk in [0x11, 0xA2, 0xA3] {
-            assert!(track_mods(Mods::default(), vk, true).ctrl);
-        }
-        for vk in [0x12, 0xA4, 0xA5] {
-            assert!(track_mods(Mods::default(), vk, true).alt);
-        }
-        for vk in [0x5B, 0x5C] {
-            assert!(track_mods(Mods::default(), vk, true).win);
-        }
-    }
-
-    #[test]
-    fn other_keys_leave_modifiers_alone() {
-        let held = Mods {
-            win: true,
-            shift: true,
-            ..Mods::default()
-        };
-        assert_eq!(track_mods(held, 0x53, true), held);
-        assert_eq!(track_mods(held, 0x53, false), held);
+        assert_eq!(mods_from(|_| false), Mods::default());
     }
 }

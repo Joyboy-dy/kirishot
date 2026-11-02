@@ -8,9 +8,7 @@ use std::sync::{Arc, Mutex};
 
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::Threading::GetCurrentThreadId;
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, KEYEVENTF_KEYUP, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT, keybd_event,
-};
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, KEYEVENTF_KEYUP, keybd_event};
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, KBDLLHOOKSTRUCT, MSG, PostThreadMessageW,
     SetWindowsHookExW, UnhookWindowsHookEx, WH_KEYBOARD_LL, WM_KEYDOWN, WM_QUIT, WM_SYSKEYDOWN,
@@ -82,7 +80,7 @@ impl Drop for HookGuard {
     }
 }
 
-fn held(vk: u16) -> bool {
+pub(crate) fn held(vk: u16) -> bool {
     (unsafe { GetAsyncKeyState(vk as i32) } as u16 & 0x8000) != 0
 }
 
@@ -108,12 +106,7 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
         if down {
             let pressed = HookKey {
                 vk: key.vkCode,
-                mods: Mods {
-                    shift: held(VK_SHIFT.0),
-                    ctrl: held(VK_CONTROL.0),
-                    alt: held(VK_MENU.0),
-                    win: held(VK_LWIN.0) || held(VK_RWIN.0),
-                },
+                mods: super::raw_keys::mods_from(held),
             };
             if press(pressed) {
                 SWALLOWED.store(key.vkCode, Ordering::SeqCst);

@@ -3,8 +3,8 @@ import { startDrag } from '@crabnebula/tauri-plugin-drag';
 import { commands, events, type ThumbStatus } from '@/lib/ipc';
 import { t } from '@/i18n';
 import { Card } from './Card';
-import type { CardState } from './cardText';
-import { pause, resume, start, tick } from './countdown';
+import { editThenLeave, tickAll, type CardState } from './cardText';
+import { pause, resume, start } from './countdown';
 import { withTimeout } from './drag';
 import { empty, push, remove, type Stack as StackModel } from './stack';
 
@@ -84,19 +84,10 @@ export function ThumbnailStack() {
   useEffect(() => {
     if (!visibleIds) return;
     const timer = window.setInterval(() => {
-      const expired: string[] = [];
-      setCards((all) => {
-        const next = { ...all };
-        for (const id of visibleIds.split(',')) {
-          const c = next[id];
-          if (!c || c.leaving) continue;
-          const r = tick(c.clock, TICK_MS);
-          if (r.expiredNow) expired.push(id);
-          next[id] = { ...c, clock: r.clock };
-        }
-        return next;
-      });
-      for (const id of expired) {
+      const r = tickAll(cardsRef.current, visibleIds.split(','), TICK_MS);
+      cardsRef.current = r.cards;
+      setCards(r.cards);
+      for (const id of r.expired) {
         void report(commands.thumbnailExpire(id)).then(() =>
           window.setTimeout(() => leaveRef.current(id), RESULT_MS),
         );
@@ -134,10 +125,9 @@ export function ThumbnailStack() {
             onHover={(on) =>
               patch(c.id, (s) => ({ ...s, clock: on ? pause(s.clock) : resume(s.clock) }))
             }
-            onEdit={() => {
-              void report(commands.thumbnailEdit(c.id));
-              leave(c.id);
-            }}
+            onEdit={() =>
+              void editThenLeave(report(commands.thumbnailEdit(c.id)), () => leave(c.id))
+            }
             onCopy={() => act(c.id, () => commands.thumbnailCopy(c.id))}
             onSave={() => act(c.id, () => commands.thumbnailSave(c.id))}
             onClose={() => leave(c.id)}

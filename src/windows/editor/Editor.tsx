@@ -155,7 +155,7 @@ export function Editor() {
     if (!doc || !stage || busy) return;
     setBusy(true);
     setSelected([]);
-    exportImage(stage, doc, view, intent)
+    exportImage(stage, doc, intent)
       .then((r) => {
         if (r.cancelled) return;
         const name = r.saved?.split(/[\\/]/).pop() ?? '';
@@ -454,6 +454,7 @@ export function Editor() {
             draft={
               draft && (
                 <AnnotationNode
+                  live
                   a={draft}
                   doc={doc}
                   pixels={loaded.pixels}

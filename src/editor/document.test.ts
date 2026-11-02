@@ -70,3 +70,11 @@ describe('document', () => {
       height: 20,
     }));
 });
+
+describe('crop', () => {
+  it('is rounded to whole pixels, so the export never resamples', () =>
+    // Edges are rounded: 10.4 → 10, 10.4 + 100.3 = 110.7 → 111, so the width is 101.
+    expect(
+      setCrop(newDoc('c', 1920, 1080), { x: 10.4, y: 20.6, width: 100.3, height: 50.5 }).crop,
+    ).toEqual({ x: 10, y: 21, width: 101, height: 50 }));
+});

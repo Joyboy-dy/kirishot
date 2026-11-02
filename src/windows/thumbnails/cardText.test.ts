@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ThumbnailPushed } from '@/lib/ipc';
-import { footerText, type CardState } from './cardText';
+import { editThenLeave, footerText, tickAll, type CardState } from './cardText';
 import { start, tick } from './countdown';
 
 const card: ThumbnailPushed = {
@@ -38,4 +38,38 @@ describe('footerText', () => {
     ));
   it('copy only', () =>
     expect(footerText(state({ card: { ...card, action: 'copy' } }))).toBe('Copiée'));
+});
+
+describe('tickAll', () => {
+  it('reports the cards that expire, outside any React updater', () => {
+    const cards = {
+      a: state({ clock: start(1000) }),
+      b: state({ clock: start(5000) }),
+    };
+    const r = tickAll(cards, ['a', 'b'], 1000);
+    expect(r.expired).toEqual(['a']);
+    expect(r.cards.a.clock.expired).toBe(true);
+    expect(r.cards.b.clock.left).toBe(4000);
+    expect(tickAll(r.cards, ['a', 'b'], 100).expired).toEqual([]);
+  });
+
+  it('skips leaving cards', () =>
+    expect(
+      tickAll({ a: state({ clock: start(100), leaving: true }) }, ['a'], 1000).expired,
+    ).toEqual([]));
+});
+
+describe('editThenLeave', () => {
+  it('leaves only once the edit request has answered', async () => {
+    const order: string[] = [];
+    let answer = () => {};
+    const edit = new Promise<void>((resolve) => (answer = resolve));
+    const done = editThenLeave(edit, () => order.push('leave'));
+    await Promise.resolve();
+    expect(order).toEqual([]);
+    order.push('edited');
+    answer();
+    await done;
+    expect(order).toEqual(['edited', 'leave']);
+  });
 });

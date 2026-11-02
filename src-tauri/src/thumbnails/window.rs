@@ -60,17 +60,23 @@ unsafe extern "system" fn no_activate(
 /// Shows the window at `bounds` (physical pixels) above everything, without activating it.
 pub fn show_at(window: &WebviewWindow, bounds: Rect) -> KResult<()> {
     let hwnd = HWND(window.hwnd().map_err(window_error)?.0);
+    // Twice: moving onto a monitor with another scale makes Windows send WM_DPICHANGED, and the
+    // window manager then rescales the window it just placed. The second call sets our size back.
+    for _ in 0..2 {
+        unsafe {
+            SetWindowPos(
+                hwnd,
+                Some(HWND_TOPMOST),
+                bounds.x,
+                bounds.y,
+                bounds.width as i32,
+                bounds.height as i32,
+                SWP_NOACTIVATE,
+            )
+            .map_err(window_error)?;
+        }
+    }
     unsafe {
-        SetWindowPos(
-            hwnd,
-            Some(HWND_TOPMOST),
-            bounds.x,
-            bounds.y,
-            bounds.width as i32,
-            bounds.height as i32,
-            SWP_NOACTIVATE,
-        )
-        .map_err(window_error)?;
         let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     }
     Ok(())

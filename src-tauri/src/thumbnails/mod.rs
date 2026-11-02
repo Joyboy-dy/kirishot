@@ -188,11 +188,31 @@ pub fn layout(app: &tauri::AppHandle, ids: &[String], more: u32) -> KResult<()> 
     window::show_at(&window, layout::stack_bounds(work, scale, &cards, more))
 }
 
-fn save_now(app: &tauri::AppHandle, id: &str) {
-    let Some(shot) = app.state::<ShotStore>().get(id) else {
-        return;
-    };
-    match output::save_image(app, &shot.image, &shot.meta) {
+/// What « Enregistrer » does on a card.
+#[derive(Debug, PartialEq, Eq)]
+pub enum SavePlan {
+    Write,
+    /// The automatic action already saved it: show that file, do not write a second one.
+    Reuse(PathBuf),
+}
+
+/// `expired_now`: this click took the automatic action over (the capture was still waiting).
+pub fn save_plan(expired_now: bool, already_saved: Option<&PathBuf>) -> SavePlan {
+    match already_saved {
+        Some(path) if !expired_now => SavePlan::Reuse(path.clone()),
+        _ => SavePlan::Write,
+    }
+}
+
+/// × on a card: a capture still waiting is dropped without its automatic action (spec J2
+/// § 3.2); one open in the editor stays. Returns the temporary file to delete.
+pub fn close_shot(shots: &ShotStore, id: &str) -> Option<PathBuf> {
+    shots.expire(id);
+    shots.release(id)
+}
+
+fn save_now(app: &tauri::AppHandle, id: &str, image: &RgbaImage, meta: &CaptureMeta) {
+    match output::save_image(app, image, meta) {
         Ok(saved) => {
             if saved.used_fallback {
                 notify::show(app, messages::FALLBACK_TITLE, messages::FALLBACK_BODY);
@@ -217,10 +237,10 @@ fn save_now(app: &tauri::AppHandle, id: &str) {
 
 /// The countdown ended: the automatic action runs, once.
 pub fn expire(app: &tauri::AppHandle, id: &str) {
-    if let Some(action) = app.state::<ShotStore>().expire(id)
-        && saves_on_expiry(action)
+    if let Some(expired) = app.state::<ShotStore>().expire(id)
+        && saves_on_expiry(expired.action)
     {
-        save_now(app, id);
+        save_now(app, id, &expired.image, &expired.meta);
     }
 }
 
@@ -245,17 +265,31 @@ pub fn copy(app: &tauri::AppHandle, id: &str) -> KResult<()> {
 /// Save from the card: replaces the automatic action.
 pub fn save(app: &tauri::AppHandle, id: &str) -> KResult<()> {
     let shots = app.state::<ShotStore>();
-    shots.get(id).ok_or_else(shot_error)?;
-    shots.expire(id);
-    save_now(app, id);
+    let shot = shots.get(id).ok_or_else(shot_error)?;
+    let expired_now = shots.expire(id).is_some();
+    let already = app
+        .state::<ThumbState>()
+        .saved
+        .lock()
+        .unwrap()
+        .get(id)
+        .cloned();
+    match save_plan(expired_now, already.as_ref()) {
+        SavePlan::Reuse(path) => emit_update(
+            app,
+            id,
+            ThumbStatus::Saved {
+                path: path.to_string_lossy().into_owned(),
+            },
+        ),
+        SavePlan::Write => save_now(app, id, &shot.image, &shot.meta),
+    }
     Ok(())
 }
 
-/// The card left the stack. A capture still waiting gets its automatic action first: closing a
-/// card never loses a capture the settings asked to save.
+/// The card left the stack (× or the end of its display).
 pub fn close(app: &tauri::AppHandle, id: &str) {
-    expire(app, id);
-    if let Some(file) = app.state::<ShotStore>().release(id) {
+    if let Some(file) = close_shot(&app.state::<ShotStore>(), id) {
         let _ = std::fs::remove_file(file);
     }
     app.state::<ThumbState>().saved.lock().unwrap().remove(id);
@@ -306,6 +340,45 @@ mod tests {
         assert!(saves_on_expiry(AutoAction::Save));
         assert!(saves_on_expiry(AutoAction::SaveAndCopy));
         assert!(!saves_on_expiry(AutoAction::Copy));
+    }
+
+    fn shot(store: &ShotStore) -> String {
+        let meta = CaptureMeta {
+            taken_at: chrono::Local::now(),
+            window_title: None,
+        };
+        store.insert(RgbaImage::new(4, 3), meta, AutoAction::SaveAndCopy)
+    }
+
+    #[test]
+    fn closing_a_waiting_card_drops_it_without_its_action() {
+        // Spec J2 § 3.2: « × ferme sans enregistrer ».
+        let store = ShotStore::default();
+        let id = shot(&store);
+        store.set_temp_png(&id, PathBuf::from("a.png"));
+        assert_eq!(close_shot(&store, &id), Some(PathBuf::from("a.png")));
+        assert!(store.expire(&id).is_none());
+        assert!(store.get(&id).is_none());
+    }
+
+    #[test]
+    fn closing_a_card_in_the_editor_keeps_the_capture() {
+        let store = ShotStore::default();
+        let id = shot(&store);
+        store.begin_edit(&id);
+        assert_eq!(close_shot(&store, &id), None);
+        assert!(store.get(&id).is_some());
+    }
+
+    #[test]
+    fn save_after_an_automatic_save_reuses_the_file() {
+        let saved = PathBuf::from("Kirishot.png");
+        assert_eq!(
+            save_plan(false, Some(&saved)),
+            SavePlan::Reuse(saved.clone())
+        );
+        assert_eq!(save_plan(true, Some(&saved)), SavePlan::Write);
+        assert_eq!(save_plan(false, None), SavePlan::Write);
     }
 
     #[test]

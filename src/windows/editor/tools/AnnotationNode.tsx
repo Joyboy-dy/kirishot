@@ -81,11 +81,14 @@ export function AnnotationNode({
   doc,
   pixels,
   events,
+  live = false,
 }: {
   a: Annotation;
   doc: Doc;
   pixels: ImageData;
   events: NodeEvents;
+  /** Being drawn: a pixelate area shows a plain veil until it is done (spec J2 § 4.3). */
+  live?: boolean;
 }) {
   const common = {
     id: a.id,
@@ -282,6 +285,17 @@ export function AnnotationNode({
       );
     }
     case 'pixelate':
+      if (live)
+        return (
+          <Rect
+            x={a.box.x}
+            y={a.box.y}
+            width={a.box.width}
+            height={a.box.height}
+            fill="rgba(14, 16, 20, 0.55)"
+            listening={false}
+          />
+        );
       return (
         <Pixelated
           a={a}
