@@ -1,6 +1,16 @@
 import { t, type MessageKey } from '@/i18n';
 
-const HINTS = ['drag', 'click', 'shift', 'arrows', 'enter', 'escape'] as const;
+const HINTS = [
+  'drag',
+  'space',
+  'shift',
+  'alt',
+  'magnifier',
+  'color',
+  'copy',
+  'enter',
+  'escape',
+] as const;
 
 /** Keyboard and mouse reminders at the bottom of the active monitor. */
 export function KeyHints() {

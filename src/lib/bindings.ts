@@ -18,8 +18,10 @@ export const commands = {
 	overlayReady: () => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_ready")),
 	/**  A selection started on this monitor: the other overlays drop theirs. */
 	overlayClaim: () => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_claim")),
-	overlayCommit: (captureId: string, target: CommitTarget) => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_commit", { captureId, target })),
+	overlayCommit: (captureId: string, target: CommitTarget, copyOnly: boolean) => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_commit", { captureId, target, copyOnly })),
 	overlayCancel: () => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_cancel")),
+	/**  Copies text, such as the colour under the magnifier. */
+	copyText: (text: string) => typedError<null, KirishotError>(__TAURI_INVOKE("copy_text", { text })),
 };
 
 /** Events */
@@ -108,6 +110,8 @@ export type OverlaySession = {
 	/**  In the monitor's coordinates; `None` when the cursor is on another monitor. */
 	cursor: Point | null,
 	commitOnRelease: boolean,
+	/**  Whether the magnifier starts shown (the overlay toggles it with M). */
+	magnifier: boolean,
 };
 
 export type Point = {

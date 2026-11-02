@@ -2,19 +2,10 @@ import type { CSSProperties } from 'react';
 import { physicalToCss, type Handle } from '@/lib/geometry';
 import type { Rect, WindowInfo } from '@/lib/ipc';
 import { t } from '@/i18n';
+import { cursorFor } from './selection';
 
 const DIM = 'rgba(4, 5, 10, 0.58)';
 const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-const HANDLE_CURSOR: Record<Handle, string> = {
-  n: 'ns-resize',
-  s: 'ns-resize',
-  e: 'ew-resize',
-  w: 'ew-resize',
-  ne: 'nesw-resize',
-  sw: 'nesw-resize',
-  nw: 'nwse-resize',
-  se: 'nwse-resize',
-};
 
 const chip: CSSProperties = {
   position: 'absolute',
@@ -48,7 +39,7 @@ function handleStyle(h: Handle, r: Rect): CSSProperties {
     borderRadius: 2,
     background: '#fff',
     border: '1.5px solid var(--k-accent)',
-    cursor: HANDLE_CURSOR[h],
+    cursor: cursorFor(h, 'adjusting', false, false),
   };
 }
 

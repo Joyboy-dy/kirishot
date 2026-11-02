@@ -61,6 +61,13 @@ pub async fn settings_update(
     Ok(view)
 }
 
+/// Copies text, such as the colour under the magnifier.
+#[tauri::command]
+#[specta::specta]
+pub async fn copy_text(text: String) -> KResult<()> {
+    crate::output::clipboard::write_text(&text)
+}
+
 fn overlay_monitor(window: &tauri::WebviewWindow) -> KResult<usize> {
     windowing::monitor_index(window.label())
         .ok_or_else(|| KirishotError::new(ErrorCode::Window, "Fenêtre de sélection inconnue"))
@@ -97,8 +104,15 @@ pub async fn overlay_commit(
     window: tauri::WebviewWindow,
     capture_id: String,
     target: CommitTarget,
+    copy_only: bool,
 ) -> KResult<()> {
-    flow::commit(&app, overlay_monitor(&window)?, &capture_id, target)
+    flow::commit(
+        &app,
+        overlay_monitor(&window)?,
+        &capture_id,
+        target,
+        copy_only,
+    )
 }
 
 #[tauri::command]
@@ -143,7 +157,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             overlay_ready,
             overlay_claim,
             overlay_commit,
-            overlay_cancel
+            overlay_cancel,
+            copy_text
         ])
         .events(collect_events![
             SettingsChanged,

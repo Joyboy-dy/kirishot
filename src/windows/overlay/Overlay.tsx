@@ -7,7 +7,10 @@ import {
   type PointerEvent,
 } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { pixelHex } from '@/lib/frame';
 import { cssToPhysical, isTooSmall, type Point } from '@/lib/geometry';
+import { NO_CHANGE } from '@/lib/settings';
+import { t } from '@/i18n';
 import { commands, type CommitTarget, type OverlaySession, type Rect } from '@/lib/ipc';
 import { KeyHints } from './KeyHints';
 import { Magnifier } from './Magnifier';
@@ -15,6 +18,7 @@ import { SelectionLayer } from './SelectionLayer';
 import { Toolbar } from './Toolbar';
 import { useOverlaySession } from './useOverlaySession';
 import {
+  cursorFor,
   initialState,
   step,
   type Ctx,
@@ -24,7 +28,17 @@ import {
   type SelState,
 } from './selection';
 
-const KEYS = new Set(['Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
+const KEYS = new Set([
+  'Escape',
+  'Enter',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'r',
+  'w',
+  'f',
+]);
 
 function contains(r: Rect, p: Point) {
   return p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height;
@@ -44,16 +58,21 @@ export function Overlay() {
   const [mode, setMode] = useState<Mode>('region');
   const [pointer, setPointer] = useState<Point | null>(null);
   const [active, setActive] = useState(false);
+  const [magnifier, setMagnifier] = useState(true);
+  const [copiedHex, setCopiedHex] = useState<string | null>(null);
+  const [space, setSpace] = useState(false);
+  const spaceRef = useRef(false);
 
   const setSelection = (next: SelState) => {
     selRef.current = next;
     setSel(next);
   };
 
-  const session = useOverlaySession(canvasRef, {
+  const { session, frame } = useOverlaySession(canvasRef, {
     onSession: (s) => {
       setSelection(initialState);
       setMode('region');
+      setMagnifier(s.magnifier);
       setActive(s.cursor !== null);
       setPointer(s.cursor);
     },
@@ -66,9 +85,15 @@ export function Overlay() {
   // Event handlers read the latest values through refs, updated after each render.
   const sessionRef = useRef<OverlaySession | null>(null);
   const modeRef = useRef(mode);
+  const magnifierRef = useRef(magnifier);
+  const pointerRef = useRef(pointer);
+  const frameRef = useRef(frame);
   useLayoutEffect(() => {
+    frameRef.current = frame;
     sessionRef.current = session;
     modeRef.current = mode;
+    magnifierRef.current = magnifier;
+    pointerRef.current = pointer;
   });
 
   const act = (outcome: Outcome) => {
@@ -76,7 +101,26 @@ export function Overlay() {
     if (!s) return;
     if (outcome.type === 'claim') report(commands.overlayClaim());
     if (outcome.type === 'cancel') report(commands.overlayCancel());
-    if (outcome.type === 'commit') report(commands.overlayCommit(s.captureId, outcome.target));
+    if (outcome.type === 'commit')
+      report(commands.overlayCommit(s.captureId, outcome.target, outcome.copyOnly ?? false));
+    if (outcome.type === 'mode') setMode(outcome.mode);
+    if (outcome.type === 'fullscreen')
+      report(commands.overlayCommit(s.captureId, { kind: 'monitor' }, false));
+  };
+
+  const toggleMagnifier = (on: boolean) => {
+    setMagnifier(on);
+    report(commands.settingsUpdate({ ...NO_CHANGE, magnifier: on }));
+  };
+
+  const copyColor = () => {
+    const frame = frameRef.current;
+    const at = pointerRef.current;
+    if (!frame || !at || !magnifierRef.current) return;
+    const hex = `#${pixelHex(frame, at)}`;
+    report(commands.copyText(hex));
+    setCopiedHex(hex);
+    window.setTimeout(() => setCopiedHex((h) => (h === hex ? null : h)), 1200);
   };
 
   const dispatch = (e: SelEvent) => {
@@ -93,18 +137,49 @@ export function Overlay() {
     act(outcome);
   };
   const dispatchRef = useRef(dispatch);
+  const toggleRef = useRef(toggleMagnifier);
+  const copyColorRef = useRef(copyColor);
   useLayoutEffect(() => {
     dispatchRef.current = dispatch;
+    toggleRef.current = toggleMagnifier;
+    copyColorRef.current = copyColor;
   });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!KEYS.has(e.key)) return;
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (k === ' ') {
+        spaceRef.current = true;
+        setSpace(true);
+        e.preventDefault();
+        return;
+      }
+      if (!e.ctrlKey && k === 'm') {
+        e.preventDefault();
+        toggleRef.current(!magnifierRef.current);
+        return;
+      }
+      if (!e.ctrlKey && k === 'c') {
+        e.preventDefault();
+        copyColorRef.current();
+        return;
+      }
+      if (!KEYS.has(k) && !(e.ctrlKey && k === 'c')) return;
       e.preventDefault();
-      dispatchRef.current({ type: 'key', key: e.key, shift: e.shiftKey });
+      dispatchRef.current({ type: 'key', key: k, shift: e.shiftKey, ctrl: e.ctrlKey });
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ') {
+        spaceRef.current = false;
+        setSpace(false);
+      }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   }, []);
 
   const scale = session?.monitor.scale ?? window.devicePixelRatio;
@@ -137,13 +212,16 @@ export function Overlay() {
   const hover =
     sel.kind === 'idle' || sel.kind === 'pressed' || sel.kind === 'dragging' ? sel.hover : null;
   const showMagnifier =
+    magnifier &&
     active &&
     pointer !== null &&
     (sel.kind === 'idle' || sel.kind === 'dragging' || sel.kind === 'resizing');
-  const cursor =
-    sel.kind === 'moving' || (sel.kind === 'adjusting' && pointer && contains(sel.rect, pointer))
-      ? 'move'
-      : 'crosshair';
+  const cursor = cursorFor(
+    null,
+    sel.kind,
+    space,
+    sel.kind === 'adjusting' && pointer !== null && contains(sel.rect, pointer),
+  );
 
   return (
     <div
@@ -153,7 +231,13 @@ export function Overlay() {
       onPointerMove={(e) => {
         const at = toPhysical(e);
         setPointer(at);
-        dispatch({ type: 'pointerMove', at, shift: e.shiftKey });
+        dispatch({
+          type: 'pointerMove',
+          at,
+          shift: e.shiftKey,
+          alt: e.altKey,
+          space: spaceRef.current,
+        });
       }}
       onPointerUp={(e) => dispatch({ type: 'pointerUp', at: toPhysical(e) })}
       onDoubleClick={(e) =>
@@ -180,10 +264,29 @@ export function Overlay() {
             hover={hover}
             withHandles={sel.kind !== 'idle' && sel.kind !== 'dragging'}
           />
-          {showMagnifier && <Magnifier source={canvasRef} at={pointer} scale={scale} />}
+          {showMagnifier && (
+            <Magnifier source={canvasRef} frame={frame} at={pointer} scale={scale} />
+          )}
+          {copiedHex && pointer && (
+            <div
+              role="status"
+              className="pointer-events-none absolute rounded-md px-2 py-1 font-mono text-[12px]"
+              style={{
+                left: pointer.x / scale + 16,
+                top: pointer.y / scale - 32,
+                background: 'rgba(14, 16, 20, 0.92)',
+                color: '#eceef2',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+              }}
+            >
+              {t('overlay.colorCopied', { hex: copiedHex })}
+            </div>
+          )}
           {active && (
             <Toolbar
               mode={mode}
+              magnifier={magnifier}
+              onMagnifier={toggleMagnifier}
               onMode={changeMode}
               onFullscreen={() => commit({ kind: 'monitor' })}
               onCancel={() => act({ type: 'cancel' })}

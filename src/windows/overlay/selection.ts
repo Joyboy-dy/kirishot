@@ -18,24 +18,26 @@ export type Mode = 'region' | 'window';
 export type SelState =
   | { kind: 'idle'; hover: WindowInfo | null }
   | { kind: 'pressed'; hover: WindowInfo | null }
-  | { kind: 'dragging'; anchor: Point; rect: Rect; hover: WindowInfo | null }
+  | { kind: 'dragging'; anchor: Point; last: Point; rect: Rect; hover: WindowInfo | null }
   | { kind: 'adjusting'; rect: Rect }
   | { kind: 'moving'; rect: Rect; grab: Point; origin: Rect }
   | { kind: 'resizing'; rect: Rect; handle: Handle; origin: Rect };
 
 export type SelEvent =
   | { type: 'pointerDown'; at: Point; handle: Handle | null; inside: boolean }
-  | { type: 'pointerMove'; at: Point; shift: boolean }
+  | { type: 'pointerMove'; at: Point; shift: boolean; alt: boolean; space: boolean }
   | { type: 'pointerUp'; at: Point }
   | { type: 'doubleClick'; inside: boolean }
-  | { type: 'key'; key: string; shift: boolean }
+  | { type: 'key'; key: string; shift: boolean; ctrl: boolean }
   | { type: 'reset' };
 
 export type Outcome =
   | { type: 'none' }
   | { type: 'claim' }
   | { type: 'cancel' }
-  | { type: 'commit'; target: CommitTarget };
+  | { type: 'commit'; target: CommitTarget; copyOnly?: true }
+  | { type: 'mode'; mode: Mode }
+  | { type: 'fullscreen' };
 
 export type Ctx = { mode: Mode; windows: WindowInfo[]; bounds: Size; commitOnRelease: boolean };
 
@@ -57,14 +59,36 @@ const commit = (target: CommitTarget): Result => ({
 });
 const region = (rect: Rect): Result => commit({ kind: 'region', rect });
 const startDrag = (at: Point, hover: WindowInfo | null): Result => ({
-  state: { kind: 'dragging', anchor: at, rect: { ...at, width: 0, height: 0 }, hover },
+  state: { kind: 'dragging', anchor: at, last: at, rect: { ...at, width: 0, height: 0 }, hover },
   outcome: { type: 'claim' },
 });
+
+const MODE_KEYS: Record<string, Outcome> = {
+  r: { type: 'mode', mode: 'region' },
+  w: { type: 'mode', mode: 'window' },
+  f: { type: 'fullscreen' },
+};
+
+/** A rectangle from the anchor to the pointer, or centred on the anchor with Alt. */
+function dragRect(anchor: Point, at: Point, square: boolean, fromCentre: boolean): Rect {
+  const r = rectFromPoints(anchor, at, square);
+  if (!fromCentre) return r;
+  return {
+    x: anchor.x - r.width,
+    y: anchor.y - r.height,
+    width: 2 * r.width,
+    height: 2 * r.height,
+  };
+}
 
 export function step(s: SelState, e: SelEvent, ctx: Ctx): Result {
   if (e.type === 'reset') return stay(initialState);
   if (e.type === 'key' && e.key === 'Escape')
     return { state: initialState, outcome: { type: 'cancel' } };
+  if (e.type === 'key' && !e.ctrl && MODE_KEYS[e.key.toLowerCase()]) {
+    const outcome = MODE_KEYS[e.key.toLowerCase()];
+    return { state: outcome.type === 'fullscreen' ? s : initialState, outcome };
+  }
 
   switch (s.kind) {
     case 'idle':
@@ -87,8 +111,19 @@ export function step(s: SelState, e: SelEvent, ctx: Ctx): Result {
 
     case 'dragging':
       if (e.type === 'pointerMove') {
-        const rect = clampRect(rectFromPoints(s.anchor, e.at, e.shift), ctx.bounds);
-        return stay({ ...s, rect });
+        if (e.space) {
+          // Space held: the rectangle follows the pointer without changing size.
+          const dx = e.at.x - s.last.x;
+          const dy = e.at.y - s.last.y;
+          return stay({
+            ...s,
+            anchor: { x: s.anchor.x + dx, y: s.anchor.y + dy },
+            last: e.at,
+            rect: moveRect(s.rect, dx, dy, ctx.bounds),
+          });
+        }
+        const rect = clampRect(dragRect(s.anchor, e.at, e.shift, e.alt), ctx.bounds);
+        return stay({ ...s, last: e.at, rect });
       }
       if (e.type === 'pointerUp') {
         if (isTooSmall(s.rect)) {
@@ -107,6 +142,11 @@ export function step(s: SelState, e: SelEvent, ctx: Ctx): Result {
       }
       if (e.type === 'doubleClick') return e.inside ? region(s.rect) : stay(s);
       if (e.type === 'key' && e.key === 'Enter') return region(s.rect);
+      if (e.type === 'key' && e.ctrl && e.key.toLowerCase() === 'c')
+        return {
+          state: initialState,
+          outcome: { type: 'commit', target: { kind: 'region', rect: s.rect }, copyOnly: true },
+        };
       if (e.type === 'key' && e.key in ARROWS) {
         const d = ARROWS[e.key];
         const by = e.shift ? 10 : 1;
@@ -129,4 +169,28 @@ export function step(s: SelState, e: SelEvent, ctx: Ctx): Result {
       if (e.type === 'pointerUp') return stay({ kind: 'adjusting', rect: s.rect });
       return stay(s);
   }
+}
+
+const HANDLE_CURSOR: Record<Handle, string> = {
+  n: 'ns-resize',
+  s: 'ns-resize',
+  e: 'ew-resize',
+  w: 'ew-resize',
+  nw: 'nwse-resize',
+  se: 'nwse-resize',
+  ne: 'nesw-resize',
+  sw: 'nesw-resize',
+};
+
+/** The pointer shape for the element under the pointer and the selection state. */
+export function cursorFor(
+  handle: Handle | null,
+  kind: SelState['kind'],
+  space: boolean,
+  insideSelection: boolean,
+): string {
+  if (handle) return HANDLE_CURSOR[handle];
+  if (kind === 'dragging' && space) return 'grabbing';
+  if (kind === 'moving' || (kind === 'adjusting' && insideSelection)) return 'move';
+  return 'crosshair';
 }

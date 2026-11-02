@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Handle } from '@/lib/geometry';
 import type { Rect, WindowInfo } from '@/lib/ipc';
 import {
+  cursorFor,
   initialState,
   step,
   type Ctx,
@@ -36,13 +37,20 @@ const down = (x: number, y: number, inside = false, handle: Handle | null = null
   handle,
   inside,
 });
-const move = (x: number, y: number, shift = false): SelEvent => ({
+const move = (x: number, y: number, shift = false, alt = false, space = false): SelEvent => ({
   type: 'pointerMove',
   at: { x, y },
   shift,
+  alt,
+  space,
 });
 const up = (x: number, y: number): SelEvent => ({ type: 'pointerUp', at: { x, y } });
-const key = (k: string, shift = false): SelEvent => ({ type: 'key', key: k, shift });
+const key = (k: string, shift = false, ctrl = false): SelEvent => ({
+  type: 'key',
+  key: k,
+  shift,
+  ctrl,
+});
 const adjusting = (rect: Rect): SelState => ({ kind: 'adjusting', rect });
 const ZONE = { x: 324, y: 266, width: 604, height: 280 };
 
@@ -122,7 +130,7 @@ describe('selection', () => {
   it('Escape cancels from any state', () => {
     const states: SelState[] = [
       initialState,
-      { kind: 'dragging', anchor: { x: 0, y: 0 }, rect: ZONE, hover: null },
+      { kind: 'dragging', anchor: { x: 0, y: 0 }, last: { x: 0, y: 0 }, rect: ZONE, hover: null },
       adjusting(ZONE),
     ];
     for (const s of states) expect(step(s, key('Escape'), ctx).outcome).toEqual({ type: 'cancel' });
@@ -147,5 +155,48 @@ describe('selection', () => {
 
   it('reset returns to idle', () => {
     expect(step(adjusting(ZONE), { type: 'reset' }, ctx).state).toEqual(initialState);
+  });
+
+  it('R W F switch modes', () => {
+    expect(step(initialState, key('r'), ctx).outcome).toEqual({ type: 'mode', mode: 'region' });
+    expect(step(initialState, key('W', true), ctx).outcome).toEqual({
+      type: 'mode',
+      mode: 'window',
+    });
+    expect(step(adjusting(ZONE), key('f'), ctx).outcome).toEqual({ type: 'fullscreen' });
+    expect(step(initialState, key('r', false, true), ctx).outcome).toEqual({ type: 'none' });
+  });
+
+  it('space while dragging moves the rectangle instead of resizing it', () => {
+    const r = run([down(100, 100), move(300, 200), move(350, 260, false, false, true)]);
+    expect(r.state).toMatchObject({
+      kind: 'dragging',
+      rect: { x: 150, y: 160, width: 200, height: 100 },
+    });
+    const r2 = run([move(400, 300)], ctx, r.state);
+    expect(r2.state).toMatchObject({ rect: { x: 150, y: 160, width: 250, height: 140 } });
+  });
+
+  it('alt draws from the centre', () => {
+    const r = run([down(500, 500), move(600, 550, false, true)]);
+    expect(r.state).toMatchObject({ rect: { x: 400, y: 450, width: 200, height: 100 } });
+  });
+
+  it('ctrl+C on an adjusted selection commits copy-only', () => {
+    const r = step(adjusting(ZONE), key('c', false, true), ctx);
+    expect(r.outcome).toEqual({
+      type: 'commit',
+      target: { kind: 'region', rect: ZONE },
+      copyOnly: true,
+    });
+  });
+
+  it('cursor follows the handle and the state', () => {
+    expect(cursorFor('nw', 'adjusting', false, false)).toBe('nwse-resize');
+    expect(cursorFor('n', 'adjusting', false, false)).toBe('ns-resize');
+    expect(cursorFor(null, 'idle', false, false)).toBe('crosshair');
+    expect(cursorFor(null, 'dragging', true, false)).toBe('grabbing');
+    expect(cursorFor(null, 'adjusting', false, true)).toBe('move');
+    expect(cursorFor(null, 'moving', false, true)).toBe('move');
   });
 });

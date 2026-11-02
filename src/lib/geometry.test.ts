@@ -3,6 +3,7 @@ import {
   clampRect,
   cssToPhysical,
   isTooSmall,
+  magnifierPlacement,
   moveRect,
   rectFromPoints,
   resizeRect,
@@ -82,4 +83,16 @@ describe('geometry', () => {
     expect(windowAt(ws, { x: 300, y: 300 })?.title).toBe('Bas');
     expect(windowAt(ws, { x: 600, y: 600 })).toBeNull();
   });
+});
+
+describe('magnifierPlacement', () => {
+  const box = { width: 128, height: 160 };
+  const viewport = { width: 1920, height: 1080 };
+  it('sits bottom-right of the cursor', () =>
+    expect(magnifierPlacement({ x: 100, y: 100 }, box, viewport)).toEqual({ x: 120, y: 120 }));
+  it('flips near the right and bottom edges', () =>
+    expect(magnifierPlacement({ x: 1900, y: 1060 }, box, viewport)).toEqual({
+      x: 1900 - 20 - 128,
+      y: 1060 - 20 - 160,
+    }));
 });

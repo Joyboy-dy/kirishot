@@ -17,6 +17,7 @@ fn main() {
                 "overlay_claim",
                 "overlay_commit",
                 "overlay_cancel",
+                "copy_text",
             ])),
     )
     .expect("failed to run tauri-build");

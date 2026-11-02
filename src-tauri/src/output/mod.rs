@@ -26,10 +26,15 @@ pub struct Delivery {
     pub error: Option<KirishotError>,
 }
 
-/// Applies the automatic action from the settings: save, copy, or both.
-pub fn deliver(app: &tauri::AppHandle, img: &RgbaImage, meta: &CaptureMeta) -> KResult<Delivery> {
+/// Applies `action`: save, copy, or both.
+pub fn deliver(
+    app: &tauri::AppHandle,
+    img: &RgbaImage,
+    meta: &CaptureMeta,
+    action: AutoAction,
+) -> KResult<Delivery> {
     let settings = app.state::<SettingsState>().get();
-    let (save, copy) = match settings.after_capture.auto_action {
+    let (save, copy) = match action {
         AutoAction::SaveAndCopy => (true, true),
         AutoAction::Copy => (false, true),
         AutoAction::Save => (true, false),

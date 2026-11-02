@@ -89,3 +89,13 @@ export function windowAt(windows: WindowInfo[], p: Point): WindowInfo | null {
     ) ?? null
   );
 }
+
+/** Top-left of the magnifier: below right of the cursor, flipped where it would overflow. */
+export function magnifierPlacement(cursor: Point, box: Size, viewport: Size, offset = 20): Point {
+  const right = cursor.x + offset + box.width <= viewport.width;
+  const below = cursor.y + offset + box.height <= viewport.height;
+  return {
+    x: right ? cursor.x + offset : cursor.x - offset - box.width,
+    y: below ? cursor.y + offset : cursor.y - offset - box.height,
+  };
+}

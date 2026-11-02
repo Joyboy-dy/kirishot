@@ -76,6 +76,16 @@ pub fn write_image(owner: Option<isize>, png: &[u8], dib: &[u8]) -> KResult<()> 
     Ok(())
 }
 
+/// Replaces the clipboard content with text, such as a colour `#CFD4DC`.
+pub fn write_text(text: &str) -> KResult<()> {
+    clipboard_win::set_clipboard_string(text).map_err(|e| {
+        KirishotError::new(
+            ErrorCode::Clipboard,
+            format!("Impossible de copier le texte : {e}"),
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -102,5 +112,12 @@ mod tests {
         // First stored row = bottom row (blue, BGRA); last row = top row, red first.
         assert_eq!(&d[124..128], &[255, 0, 0, 255]);
         assert_eq!(&d[124 + 8..124 + 12], &[0, 0, 255, 255]);
+    }
+
+    #[test]
+    fn write_text_round_trips() {
+        write_text("#CFD4DC").unwrap();
+        let back: String = clipboard_win::get_clipboard_string().unwrap();
+        assert_eq!(back, "#CFD4DC");
     }
 }

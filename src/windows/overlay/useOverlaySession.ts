@@ -1,7 +1,7 @@
 // Receives frozen screens from Rust: the pixels arrive as a WebView2 shared buffer, with the
 // session (monitor, windows, cursor) as the event's additionalData.
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { decodeFrame } from '@/lib/frame';
+import { decodeFrame, type Frame } from '@/lib/frame';
 import { commands, events, unwrap, type OverlaySession } from '@/lib/ipc';
 
 type SharedBufferEvent = { getBuffer(): ArrayBuffer; additionalData: unknown };
@@ -28,6 +28,8 @@ export function useOverlaySession(
 ) {
   const [session, setSession] = useState<OverlaySession | null>(null);
   const sessionRef = useRef<OverlaySession | null>(null);
+  // A copy of the pixels: the shared buffer is released as soon as the canvas is drawn.
+  const [frame, setFrame] = useState<Frame | null>(null);
   const handlersRef = useRef(handlers);
   useEffect(() => {
     handlersRef.current = handlers;
@@ -39,6 +41,7 @@ export function useOverlaySession(
       const next = e.additionalData as OverlaySession;
       try {
         const frame = decodeFrame(buffer);
+        setFrame({ ...frame, pixels: frame.pixels.slice() });
         const canvas = canvasRef.current!;
         canvas.width = frame.width;
         canvas.height = frame.height;
@@ -64,6 +67,7 @@ export function useOverlaySession(
       events.overlayReset.listen(() => {
         const canvas = canvasRef.current;
         if (canvas) canvas.width = 0; // frees the frozen screen's memory
+        setFrame(null);
         sessionRef.current = null;
         setSession(null);
         handlersRef.current.onReset();
@@ -82,5 +86,5 @@ export function useOverlaySession(
     };
   }, [canvasRef]);
 
-  return session;
+  return { session, frame };
 }

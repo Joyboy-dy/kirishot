@@ -14,6 +14,7 @@ use crate::error::{ErrorCode, KResult, KirishotError};
 use crate::geometry::{Point, monitor_at_point, resolve_target, windows_for_monitor};
 use crate::output::{CaptureMeta, deliver};
 use crate::settings::SettingsState;
+use crate::settings::model::AutoAction;
 use crate::store::CaptureStore;
 use crate::{frame, notify, windowing};
 
@@ -28,6 +29,8 @@ pub struct OverlaySession {
     /// In the monitor's coordinates; `None` when the cursor is on another monitor.
     pub cursor: Option<Point>,
     pub commit_on_release: bool,
+    /// Whether the magnifier starts shown (the overlay toggles it with M).
+    pub magnifier: bool,
 }
 
 /// Tells the other overlays to drop their selection: a selection stays on one monitor.
@@ -147,7 +150,7 @@ fn start_region(app: &tauri::AppHandle) -> KResult<()> {
     windowing::ensure_overlays(app, &monitors)?;
     let cursor = cursor(app);
     let cursor_monitor = cursor.and_then(|c| monitor_at_point(&monitors, c));
-    let commit_on_release = app.state::<SettingsState>().get().capture.commit_on_release;
+    let settings = app.state::<SettingsState>().get();
     let posts: Vec<(usize, Vec<u8>, String)> = session
         .monitors
         .iter()
@@ -162,7 +165,8 @@ fn start_region(app: &tauri::AppHandle) -> KResult<()> {
                     x: c.x - info.x,
                     y: c.y - info.y,
                 }),
-                commit_on_release,
+                commit_on_release: settings.capture.commit_on_release,
+                magnifier: settings.capture.magnifier,
             };
             let json = serde_json::to_string(&overlay).expect("session always serializes");
             (i, frame::encode_frame(&shot.image), json)
@@ -217,7 +221,8 @@ fn run_fullscreen(app: &tauri::AppHandle) -> KResult<()> {
         window_title: title,
     };
     app.state::<FlowState>().finish();
-    report(app, deliver(app, &img, &meta));
+    let action = app.state::<SettingsState>().get().after_capture.auto_action;
+    report(app, deliver(app, &img, &meta, action));
     Ok(())
 }
 
@@ -267,6 +272,7 @@ pub fn commit(
     monitor: usize,
     capture_id: &str,
     target: CommitTarget,
+    copy_only: bool,
 ) -> KResult<()> {
     let flow = app.state::<FlowState>();
     if flow.active_capture().as_deref() != Some(capture_id) {
@@ -287,8 +293,13 @@ pub fn commit(
     };
     drop(session);
     end_selection(app);
+    let action = if copy_only {
+        AutoAction::Copy
+    } else {
+        app.state::<SettingsState>().get().after_capture.auto_action
+    };
     let app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || report(&app, deliver(&app, &img, &meta)));
+    tauri::async_runtime::spawn_blocking(move || report(&app, deliver(&app, &img, &meta, action)));
     Ok(())
 }
 

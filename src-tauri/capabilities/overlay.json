@@ -2,7 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "overlay",
   "description": "Selection overlays: one per monitor",
-  "windows": ["overlay-*"],
+  "windows": [
+    "overlay-*"
+  ],
   "permissions": [
     "core:event:default",
     "core:window:allow-set-focus",
@@ -10,6 +12,8 @@
     "allow-overlay-ready",
     "allow-overlay-claim",
     "allow-overlay-commit",
-    "allow-overlay-cancel"
+    "allow-overlay-cancel",
+    "allow-copy-text",
+    "allow-settings-update"
   ]
 }
