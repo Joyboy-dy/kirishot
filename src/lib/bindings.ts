@@ -217,6 +217,7 @@ export type SettingsPatch = {
 	commitOnRelease: boolean | null,
 	mode: CaptureMode | null,
 	toolbarPosition: ToolbarPosition | null,
+	launchAtStartup: boolean | null,
 };
 
 /**  What the settings page displays: the settings plus the resolved destination folder. */

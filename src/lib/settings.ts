@@ -14,4 +14,5 @@ export const NO_CHANGE: SettingsPatch = {
   commitOnRelease: null,
   mode: null,
   toolbarPosition: null,
+  launchAtStartup: null,
 };

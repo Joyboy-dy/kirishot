@@ -43,6 +43,7 @@ drag = "2.1"
 clipboard-win = "5.4"
 webview2-com = "0.39"
 windows = { version = "0.62", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Dwm", "Win32_System_Threading", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_Registry", "Win32_System_LibraryLoader", "Win32_UI_Input", "Win32_Media_Audio", "Win32_Graphics_Gdi", "Win32_UI_Shell"] }
+tauri-plugin-autostart = "2"
 
 [dev-dependencies]
 tempfile = "3"

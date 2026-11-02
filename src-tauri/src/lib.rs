@@ -14,6 +14,7 @@ mod paths;
 mod settings;
 mod shots;
 mod sound;
+mod startup;
 mod store;
 mod thumbnails;
 mod tray;
@@ -47,6 +48,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_drag::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![startup::AUTOSTART_ARG]),
+        ))
         .manage(store::CaptureStore::default())
         .manage(shots::ShotStore::default())
         .manage(thumbnails::ThumbState::default())
@@ -78,6 +83,7 @@ pub fn run() {
             // Thumbnail files from a previous run are never shown again.
             thumbnails::temp::clear(&paths::temp_dir());
             let shortcuts = loaded.settings.shortcuts.clone();
+            let launch_at_startup = loaded.settings.system.launch_at_startup;
             app.manage(settings::SettingsState::new(
                 paths::settings_file(),
                 loaded.settings,
@@ -100,6 +106,18 @@ pub fn run() {
             hotkeys::register_all(app.handle(), &shortcuts);
             if let Err(e) = tray::build(app.handle()) {
                 log::error!("{e}");
+            }
+            // Dev builds never register their throwaway binary to start with Windows.
+            if !cfg!(debug_assertions)
+                && let Err(e) = startup::apply_autostart(app.handle(), launch_at_startup)
+            {
+                log::warn!("{e}");
+            }
+            // Launched by the user (not at logon): show the window, or nothing seems to happen.
+            if startup::launched_by_user(&std::env::args().collect::<Vec<_>>())
+                && let Err(e) = windowing::open_main(app.handle())
+            {
+                log::error!("cannot open the main window: {e}");
             }
             log::info!(
                 "{} {} started",

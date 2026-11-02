@@ -55,7 +55,12 @@ pub async fn settings_update(
     state: tauri::State<'_, SettingsState>,
     patch: SettingsPatch,
 ) -> KResult<SettingsView> {
+    let autostart = patch.launch_at_startup;
     let next = state.update(|s| apply_patch(s, patch))?;
+    // The setting is stored either way; a refusal from Windows is reported to the page.
+    if let Some(on) = autostart {
+        crate::startup::apply_autostart(&app, on)?;
+    }
     let view = settings_view(&app, &next)?;
     if let Err(e) = SettingsChanged(view.clone()).emit(&app) {
         log::warn!("cannot emit settings-changed: {e}");

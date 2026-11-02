@@ -210,6 +210,7 @@ pub struct SettingsPatch {
     pub commit_on_release: Option<bool>,
     pub mode: Option<CaptureMode>,
     pub toolbar_position: Option<ToolbarPosition>,
+    pub launch_at_startup: Option<bool>,
 }
 
 /// How long a thumbnail stays; a patch cannot carry `null` to mean "until closed".
@@ -237,6 +238,7 @@ impl SettingsPatch {
             commit_on_release: None,
             mode: None,
             toolbar_position: None,
+            launch_at_startup: None,
         }
     }
 }
@@ -283,6 +285,9 @@ pub fn apply_patch(s: &mut Settings, p: SettingsPatch) {
     }
     if let Some(position) = p.toolbar_position {
         s.capture.toolbar_position = position;
+    }
+    if let Some(on) = p.launch_at_startup {
+        s.system.launch_at_startup = on;
     }
 }
 
