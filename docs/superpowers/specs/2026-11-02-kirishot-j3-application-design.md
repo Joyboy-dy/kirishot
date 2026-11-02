@@ -89,6 +89,19 @@ Kirishot s'ouvre comme une vraie application, retrouve chaque capture dans son h
 - Un bouton « + » après la palette ouvre un sélecteur : zone teinte-saturation, curseur de teinte, champ hexadécimal (`react-colorful`, MIT), et les 8 dernières couleurs libres (`editor.recentColors` dans les réglages).
 - Pipette : bouton dans le sélecteur, ou touche I. API `EyeDropper` de WebView2 : la couleur est prise n'importe où sur l'écran, image et autres applications comprises. Échap annule. La couleur prise devient la couleur courante et entre dans les récentes. Si l'API manque, le bouton n'est pas affiché.
 
+### 3.5 Fermer avec des modifications non enregistrées
+
+- Une capture a des modifications non enregistrées quand son état est `dirty`, ou `never` avec un document différent de celui de l'ouverture (annotation, recadrage).
+- Toute fermeture de l'éditeur passe par la même vérification : la croix de la fenêtre, Alt+F4, Échap sans sélection, et l'ouverture d'une autre capture dans l'éditeur (vignette « Modifier », historique « Éditer »). « Copier et fermer » ne demande rien : l'utilisateur a choisi de partir avec la copie.
+- Avec des modifications non enregistrées et `editor.confirmClose` à `true`, une boîte de dialogue s'ouvre dans l'éditeur : titre « Enregistrer les modifications ? », texte « Les annotations de cette capture n'ont pas été enregistrées dans un fichier. », boutons **Enregistrer** (action principale, Entrée), **Ne pas enregistrer**, **Annuler** (Échap), et une case « Ne plus demander ».
+  - Enregistrer : enregistre (§ 3.2), puis ferme ; si l'enregistrement échoue, la fenêtre reste ouverte avec l'erreur.
+  - Ne pas enregistrer : ferme sans écrire de fichier. Les annotations restent dans l'historique (autosauvegarde), où « Éditer » les retrouve.
+  - Annuler : rien ne se passe, l'éditeur reste ouvert.
+  - « Ne plus demander » cochée, puis Enregistrer ou Ne pas enregistrer : `editor.confirmClose` passe à `false`. Elle est ignorée avec Annuler.
+- Avec `editor.confirmClose` à `false`, la fermeture se fait sans question, comme « Ne pas enregistrer ».
+- Le réglage se rétablit dans Réglages › Après capture › Éditeur : « Demander avant de fermer une capture modifiée ».
+- Le bouton Enregistrer reste toujours visible dans la barre du haut, avec son libellé en disposition complète (icône seule en dessous de 1 100 px), et Ctrl+S.
+
 ## 4. Application principale
 
 ### 4.1 Navigation
@@ -119,7 +132,7 @@ Kirishot s'ouvre comme une vraie application, retrouve chaque capture dans son h
 |---|---|
 | Général | dossier, format, modèle de nom (aperçu en direct, jetons `{date}`, `{heure}`, `{fenêtre}`, `{n}` de la spec v1 § 7.3, avec leur liste cliquable sous le champ), lancer au démarrage, thème (Comme Windows, Sombre, Clair) |
 | Capture | mode au début, loupe, son, flash, inclure le curseur, capturer au relâchement, position de la barre |
-| Après capture | action automatique, vignette, durée de la vignette, toujours ouvrir l'éditeur |
+| Après capture | action automatique, vignette, durée de la vignette, toujours ouvrir l'éditeur ; section Éditeur : demander avant de fermer une capture modifiée |
 | Historique | durée de conservation, ouvrir le dossier, vider l'historique |
 
 - Thème : `system.theme` applique `data-theme` à toutes les fenêtres sauf l'écran de sélection (toujours sombre) ; « Comme Windows » suit le système.
@@ -136,6 +149,7 @@ Ajouts à `settings.json`, toujours en version 1 :
 
 - `capture.startMode` : `"region"` | `"window"` | `"last"`, défaut `"region"`.
 - `editor.recentColors` : liste de 0 à 8 couleurs `#RRGGBB`, défaut vide.
+- `editor.confirmClose` : booléen, défaut `true`.
 - `history.retentionDays` existe déjà (7, 30, 90 ou `null`).
 
 ## 6. Erreurs
