@@ -48,6 +48,8 @@ La règle est globale : tout élément interactif (`button`, `a`, `[role=button]
 
 ### 2.3 Raccourcis ajoutés
 
+> Modifié par J2.1 (ligne d'aide remplacée par « ? », mode Zone sans aimantation des fenêtres) : voir `2026-11-02-kirishot-j2-1-corrections-design.md`.
+
 - **Espace + glisser** pendant le tracé : déplace la sélection sans la redimensionner.
 - **Alt** pendant le tracé ou le redimensionnement : depuis le centre.
 - **R**, **W**, **F** : modes Zone, Fenêtre, Plein écran.
@@ -119,6 +121,8 @@ La règle est globale : tout élément interactif (`button`, `a`, `[role=button]
 
 ### 4.2 Outils
 
+> Modifié par J2.1 (options par élément selon la table du § 3.1) : voir `2026-11-02-kirishot-j2-1-corrections-design.md`.
+
 | Outil | Touche | Comportement |
 |---|---|---|
 | Sélection | V | Clic, Maj+clic pour ajouter, cadre de sélection. Déplacer, redimensionner, Alt+glisser duplique, Suppr supprime, flèches déplacent de 1 px (Maj : 10 px). |
@@ -139,6 +143,8 @@ La règle est globale : tout élément interactif (`button`, `a`, `[role=button]
 - Info-bulles « Flèche · A » sur tous les boutons.
 
 ### 4.3 Modèle et rendu
+
+> Modifié par J2.1 (export sur une scène hors écran) : voir `2026-11-02-kirishot-j2-1-corrections-design.md`.
 
 - `src/editor/document.ts` : le document de la spec v1 (§ 7.2), sans `spotlight`, `magnifier` ni `beautify` pour ce jalon. Les champs ajoutés : `text.style: 'plain' | 'pill' | 'outline'`, `blur.kind: 'pixelate'`. TypeScript pur, testé sans interface.
 - Historique d'annulation : copies immuables, 200 au plus.

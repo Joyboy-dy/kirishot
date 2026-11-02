@@ -81,3 +81,35 @@
 
 48. Chaque interrupteur (loupe, son, flash, vignette, toujours ouvrir l'éditeur) et la durée de la vignette sont gardés après un redémarrage. Activer le son joue le clic.
 49. Après Win+L ou Ctrl+Alt+Suppr, retour sur la session, éditeur ouvert : Win + Maj + S lance toujours une capture, et Maj+S tapé dans un texte n'en lance pas.
+
+## J2.1 : corrections après tests
+
+### Écran de capture
+
+50. Mode Zone (R) : survoler une fenêtre ne la surligne pas ; un simple clic ne capture rien ; un glisser trace la zone.
+51. Mode Fenêtre (W) : la fenêtre survolée est surlignée avec son titre (tronqué s'il est long) ; un clic la capture ; glisser ne trace rien.
+52. Le mode choisi est repris à la capture suivante, même après un redémarrage. F ne change pas le mode mémorisé.
+53. Le bouton « ? » de la barre et la touche ? affichent la liste des raccourcis ; ? la referme ; Échap la referme sans quitter la capture. Plus aucune ligne d'aide en bas.
+54. Réglages › Capture › Position de la barre d'outils : Bas place la barre en bas de l'écran de capture, Haut la remet en haut.
+55. Réglages › Capture › « Capturer dès que je relâche la souris » : activé, relâcher la souris capture la zone sans Entrée ; désactivé, Entrée reste nécessaire.
+
+### Éditeur : outils
+
+56. Texte : un clic puis la frappe immédiate écrit dans le champ ; Entrée va à la ligne ; Ctrl+Entrée, Échap ou un clic ailleurs valident ; un clic ailleurs n'ouvre pas un second champ.
+57. Texte : un clic sur un texte existant (outil Texte) ou un double-clic (outil Sélection) le modifie ; vider le texte le supprime.
+58. Tirets et points sur la flèche (droite et courbée), la ligne, le rectangle et l'ellipse : chaque style se voit nettement, les points sont ronds.
+59. Opacité sur chaque élément qui la propose (flèche, ligne, rectangle, ellipse, crayon, surligneur) : le curseur va de 10 à 100 % et l'effet suit.
+60. Surligneur : couleur, épaisseur et opacité modifiables, à la création comme après coup.
+61. Pixelisation : intensité fine, moyenne et forte visibles à la création et après coup.
+62. Une option affichée agit toujours ; une option sans effet sur l'élément n'est jamais affichée (texte : pas de tirets ; étape : pas d'opacité ; pixelisation : seulement l'intensité).
+63. Sélection mixte (flèche + surligneur) : seules couleur, épaisseur et opacité sont proposées ; un changement s'annule en un seul Ctrl+Z.
+64. Bulle : un élément collé à chacun des quatre bords, puis une sélection qui couvre toute l'image : la bulle reste entière à l'écran ; dans une fenêtre étroite, elle passe sur deux lignes.
+
+### Éditeur : fenêtre et retours
+
+65. Largeur 1 300 px : barre complète. Vers 900 px : pastille de couleur et bouton « Style », bouton principal « Terminer ». Vers 600 px : icônes seules. À 520 px : la barre passe au plus sur deux lignes. Jamais de barre de défilement ni de libellé coupé sur deux lignes.
+66. La fenêtre ne descend pas sous 520 × 400. La barre d'état masque le nombre d'annotations quand la fenêtre est étroite.
+67. Copier : l'icône devient une coche environ 1,5 s ; la barre d'état affiche « Copiée… » puis s'efface après 4 s.
+68. Enregistrer : coche sur le bouton, « Enregistrée : <nom> » dans la barre d'état, effacé après 4 s. Une erreur reste affichée jusqu'à l'action suivante.
+69. Copier et fermer : la coche se voit brièvement, puis la fenêtre se ferme.
+70. Aucun flash ni saut de l'image au clic sur Copier ou Enregistrer, y compris zoomé et après un recadrage ; l'image exportée garde la pleine résolution du recadrage.
