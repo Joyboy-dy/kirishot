@@ -43,6 +43,7 @@ mod tests {
             taken_at: chrono::Local::now(),
             monitors: Vec::new(),
             windows: Vec::new(),
+            pointer: None,
         }
     }
 

@@ -1,3 +1,4 @@
+pub mod cursor;
 pub mod monitors;
 pub mod types;
 pub mod windows;
@@ -7,9 +8,15 @@ use types::{CaptureSession, MonitorShot};
 
 use crate::error::KResult;
 
-/// Captures every monitor in parallel and lists the visible windows at the same moment.
-pub fn capture_all() -> KResult<CaptureSession> {
+/// Captures every monitor in parallel and lists the visible windows at the same moment. With
+/// `include_cursor`, the pointer is kept to be drawn into the final image (spec J3 § 2.5).
+pub fn capture_all(include_cursor: bool) -> KResult<CaptureSession> {
     let infos = list_monitors()?;
+    let pointer = if include_cursor {
+        cursor::read_cursor()
+    } else {
+        None
+    };
     let own_pid = std::process::id();
     let (shots, windows) = std::thread::scope(|s| {
         let windows = s.spawn(move || self::windows::enumerate_windows(own_pid));
@@ -28,6 +35,7 @@ pub fn capture_all() -> KResult<CaptureSession> {
         taken_at: chrono::Local::now(),
         monitors: shots?,
         windows,
+        pointer,
     })
 }
 
@@ -38,7 +46,7 @@ mod tests {
     #[test]
     #[ignore = "needs a real display"]
     fn capture_all_smoke() {
-        let session = capture_all().unwrap();
+        let session = capture_all(false).unwrap();
         assert!(!session.monitors.is_empty());
         for shot in &session.monitors {
             assert_eq!(shot.image.dimensions(), (shot.info.width, shot.info.height));

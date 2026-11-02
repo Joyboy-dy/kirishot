@@ -48,4 +48,7 @@ pub struct CaptureSession {
     pub monitors: Vec<MonitorShot>,
     /// Virtual-desktop coordinates, topmost first.
     pub windows: Vec<WindowInfo>,
+    /// The pointer when `capture.includeCursor` is on: drawn into the final image only, so the
+    /// frozen screen never shows it twice.
+    pub pointer: Option<crate::capture::cursor::CursorImage>,
 }

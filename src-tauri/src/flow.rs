@@ -230,7 +230,7 @@ fn cursor(app: &tauri::AppHandle) -> Option<Point> {
 }
 
 fn start_region(app: &tauri::AppHandle) -> KResult<()> {
-    let session = capture::capture_all()?;
+    let session = capture::capture_all(app.state::<SettingsState>().get().capture.include_cursor)?;
     let monitors: Vec<MonitorInfo> = session.monitors.iter().map(|s| s.info.clone()).collect();
     windowing::ensure_overlays(app, &monitors)?;
     let cursor = cursor(app);
@@ -293,7 +293,7 @@ fn watch_reveal(app: &tauri::AppHandle, id: String) {
 }
 
 fn run_fullscreen(app: &tauri::AppHandle) -> KResult<()> {
-    let session = capture::capture_all()?;
+    let session = capture::capture_all(app.state::<SettingsState>().get().capture.include_cursor)?;
     crate::sound::play_shutter(app);
     let monitors: Vec<MonitorInfo> = session.monitors.iter().map(|s| s.info.clone()).collect();
     let index = cursor(app)
@@ -305,7 +305,12 @@ fn run_fullscreen(app: &tauri::AppHandle) -> KResult<()> {
         .get(index)
         .ok_or_else(|| KirishotError::new(ErrorCode::Capture, "Aucun écran à capturer"))?;
     let (rect, title) = resolve_target(&CommitTarget::Monitor, &shot.info, &[])?;
-    let img = crop(&shot.image, rect);
+    let img = with_pointer(
+        crop(&shot.image, rect),
+        session.pointer.as_ref(),
+        &shot.info,
+        rect,
+    );
     let meta = CaptureMeta {
         taken_at: session.taken_at,
         window_title: title,
@@ -314,6 +319,19 @@ fn run_fullscreen(app: &tauri::AppHandle) -> KResult<()> {
     app.state::<FlowState>().finish();
     after_capture(app, img, meta, &monitor, false);
     Ok(())
+}
+
+/// The capture with the pointer drawn where it was, if it was kept (spec J3 § 2.5).
+fn with_pointer(
+    mut img: image::RgbaImage,
+    pointer: Option<&crate::capture::cursor::CursorImage>,
+    monitor: &MonitorInfo,
+    r: crate::geometry::Rect,
+) -> image::RgbaImage {
+    if let Some(p) = pointer {
+        crate::capture::cursor::blend_cursor(&mut img, p, (monitor.x + r.x, monitor.y + r.y));
+    }
+    img
 }
 
 fn crop(img: &image::RgbaImage, r: crate::geometry::Rect) -> image::RgbaImage {
@@ -377,7 +395,12 @@ pub fn commit(
         .ok_or_else(|| KirishotError::new(ErrorCode::InvalidSelection, "Écran introuvable"))?;
     let local = windows_for_monitor(&session.windows, &shot.info);
     let (rect, title) = resolve_target(&target, &shot.info, &local)?;
-    let img = crop(&shot.image, rect);
+    let img = with_pointer(
+        crop(&shot.image, rect),
+        session.pointer.as_ref(),
+        &shot.info,
+        rect,
+    );
     let meta = CaptureMeta {
         taken_at: session.taken_at,
         window_title: title,
