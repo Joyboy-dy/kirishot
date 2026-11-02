@@ -122,6 +122,26 @@ body {
   }
 }
 
+/* Thumbnails enter from below and leave to the right. */
+@keyframes k-thumb-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+@keyframes k-thumb-out {
+  to {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
+.k-thumb-in {
+  animation: k-thumb-in var(--k-dur-panel) var(--k-ease-in);
+}
+.k-thumb-out {
+  animation: k-thumb-out var(--k-dur-fast) var(--k-ease-out) forwards;
+}
+
 /* A pressed control sinks slightly. */
 .k-press {
   transition:

@@ -15,7 +15,7 @@ export default defineConfig(() => ({
   },
   build: {
     rollupOptions: {
-      input: { main: 'index.html', overlay: 'overlay.html' },
+      input: { main: 'index.html', overlay: 'overlay.html', thumbnails: 'thumbnails.html' },
     },
   },
   test: {

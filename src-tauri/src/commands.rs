@@ -68,6 +68,7 @@ pub async fn settings_update(
 #[specta::specta]
 pub async fn thumbnails_ready(state: tauri::State<'_, ThumbState>) -> KResult<()> {
     state.mark_ready();
+    log::debug!("thumbnails page ready");
     Ok(())
 }
 
