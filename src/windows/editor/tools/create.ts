@@ -63,9 +63,9 @@ export function begin(tool: ToolId, at: Point, style: Style, image: Image): Anno
     case 'pen':
       return { id, tool, points: [at], stroke };
     case 'highlighter':
-      return { id, tool, points: [at], color: style.color, width: stroke.width * 4 };
+      return { id, tool, points: [at], color: style.color, width: stroke.width * 4, opacity: 1 };
     case 'pixelate':
-      return { id, tool, box: zero };
+      return { id, tool, box: zero, block: 16 };
     default:
       return null;
   }

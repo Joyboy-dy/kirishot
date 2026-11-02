@@ -12,6 +12,8 @@ export type Stroke = {
 };
 export type Fill = { kind: 'none' | 'translucent' | 'solid'; color: string };
 export type TextStyle = 'plain' | 'pill' | 'outline';
+/** Pixelation block size in image pixels: fine, medium, strong (spec J2.1 § 3.2). */
+export type Block = 8 | 16 | 28;
 
 export type Annotation =
   | {
@@ -25,7 +27,14 @@ export type Annotation =
   | { id: string; tool: 'line'; points: [Point, Point]; stroke: Stroke }
   | { id: string; tool: 'rect' | 'ellipse'; box: Rect; stroke: Stroke; fill: Fill; shadow: boolean }
   | { id: string; tool: 'pen'; points: Point[]; stroke: Stroke }
-  | { id: string; tool: 'highlighter'; points: Point[]; color: string; width: number }
+  | {
+      id: string;
+      tool: 'highlighter';
+      points: Point[];
+      color: string;
+      width: number;
+      opacity: number;
+    }
   | {
       id: string;
       tool: 'text';
@@ -36,7 +45,7 @@ export type Annotation =
       style: TextStyle;
     }
   | { id: string; tool: 'step'; at: Point; color: string; size: number }
-  | { id: string; tool: 'pixelate'; box: Rect };
+  | { id: string; tool: 'pixelate'; box: Rect; block: Block };
 
 export type Doc = {
   version: 1;
@@ -48,6 +57,18 @@ export type Doc = {
 
 export function newDoc(captureId: string, w: number, h: number): Doc {
   return { version: 1, captureId, size: { w, h }, crop: null, annotations: [] };
+}
+
+/** A document saved before J2.1 gets the fields added since, with their defaults. */
+export function normalizeDoc(d: Doc): Doc {
+  return {
+    ...d,
+    annotations: d.annotations.map((a) => {
+      if (a.tool === 'highlighter') return { ...a, opacity: a.opacity ?? 1 };
+      if (a.tool === 'pixelate') return { ...a, block: a.block ?? 16 };
+      return a;
+    }),
+  };
 }
 
 export function add(d: Doc, a: Annotation): Doc {

@@ -3,12 +3,14 @@ import {
   add,
   duplicate,
   newDoc,
+  normalizeDoc,
   remove,
   reorder,
   setCrop,
   stepNumber,
   update,
   type Annotation,
+  type Doc,
 } from './document';
 
 const empty = newDoc('cap', 1920, 1080);
@@ -77,4 +79,36 @@ describe('crop', () => {
     expect(
       setCrop(newDoc('c', 1920, 1080), { x: 10.4, y: 20.6, width: 100.3, height: 50.5 }).crop,
     ).toEqual({ x: 10, y: 21, width: 101, height: 50 }));
+});
+
+describe('normalizeDoc', () => {
+  it('gives old highlighters full opacity and old pixelate areas medium blocks', () => {
+    const old = {
+      ...empty,
+      annotations: [
+        { id: 'h', tool: 'highlighter', points: [{ x: 0, y: 0 }], color: '#ff0', width: 20 },
+        { id: 'p', tool: 'pixelate', box: { x: 0, y: 0, width: 50, height: 50 } },
+      ],
+    } as unknown as Doc;
+    const doc = normalizeDoc(old);
+    expect(doc.annotations[0]).toMatchObject({ tool: 'highlighter', opacity: 1 });
+    expect(doc.annotations[1]).toMatchObject({ tool: 'pixelate', block: 16 });
+  });
+
+  it('keeps values already set', () => {
+    const doc = {
+      ...empty,
+      annotations: [
+        {
+          id: 'h',
+          tool: 'highlighter',
+          points: [],
+          color: '#ff0',
+          width: 20,
+          opacity: 0.5,
+        } as Annotation,
+      ],
+    };
+    expect(normalizeDoc(doc).annotations[0]).toMatchObject({ opacity: 0.5 });
+  });
 });
