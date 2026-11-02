@@ -22,6 +22,10 @@ pub struct EditorSession {
     pub width: u32,
     pub height: u32,
     pub title: String,
+    /// The file the capture was last saved to (by the thumbnail or an earlier edit).
+    pub saved_path: Option<String>,
+    /// The autosaved document, when the capture is reopened from the history.
+    pub document: Option<String>,
 }
 
 #[derive(Default)]
@@ -108,11 +112,17 @@ pub fn open(app: &tauri::AppHandle, id: &str) -> KResult<()> {
         ));
     }
     let title = editor_title(shot.meta.taken_at.naive_local());
+    let entry = crate::history::entry(app, id).ok();
+    let document = crate::history::file(app, id, crate::history::index::DOCUMENT_FILE)
+        .ok()
+        .and_then(|p| std::fs::read_to_string(p).ok());
     let session = EditorSession {
         capture_id: id.to_string(),
         width,
         height,
         title: title.clone(),
+        saved_path: entry.and_then(|e| e.saved_path),
+        document,
     };
     let json = serde_json::to_string(&session).expect("session always serializes");
     let pixels = frame::encode_frame(&shot.image);
@@ -193,6 +203,8 @@ pub fn export(
     capture_id: &str,
     intent: ExportIntent,
     png: Vec<u8>,
+    current: Option<std::path::PathBuf>,
+    name: Option<String>,
 ) -> KResult<ExportResult> {
     let invalid = |e: &dyn std::fmt::Display| {
         KirishotError::new(
@@ -220,10 +232,26 @@ pub fn export(
             crate::output::copy_image(app, &img, &mut Some(png))?;
             result.copied = true;
         }
-        ExportIntent::Save => {
-            let saved = crate::output::save_image(app, &img, &meta)?;
-            result.used_fallback = saved.used_fallback;
-            result.saved = Some(saved.path.to_string_lossy().into_owned());
+        ExportIntent::Save | ExportIntent::SaveVersion => {
+            let target = match (intent, current.as_deref()) {
+                (ExportIntent::SaveVersion, Some(cur)) => {
+                    SaveTarget::Replace(version_path(cur, |p| p.exists()))
+                }
+                _ => save_target(current.as_deref(), std::path::PathBuf::new),
+            };
+            match target {
+                SaveTarget::Replace(path) => {
+                    write_image(&path, &img)?;
+                    result.saved = Some(path.to_string_lossy().into_owned());
+                }
+                // A first save: the usual folder, name and fallback, with the name chosen in
+                // the editor if any (spec J3 § 3.3).
+                SaveTarget::Create(_) => {
+                    let saved = crate::output::save_image_named(app, &img, &meta, name.as_deref())?;
+                    result.used_fallback = saved.used_fallback;
+                    result.saved = Some(saved.path.to_string_lossy().into_owned());
+                }
+            }
         }
         ExportIntent::SaveAs => match save_as(app, &img, &meta)? {
             Some(path) => result.saved = Some(path),
@@ -349,11 +377,91 @@ fn write_atomic(dir: &std::path::Path, name: &str, bytes: &[u8]) -> KResult<std:
     Ok(path)
 }
 
+/// Where « Enregistrer » writes (spec J3 § 3.2).
+#[derive(Debug, PartialEq, Eq)]
+pub enum SaveTarget {
+    /// The capture's file, replaced (recreated there if it was deleted meanwhile).
+    Replace(std::path::PathBuf),
+    /// A first save: a new file.
+    Create(std::path::PathBuf),
+}
+
+pub fn save_target(
+    current: Option<&std::path::Path>,
+    new_path: impl FnOnce() -> std::path::PathBuf,
+) -> SaveTarget {
+    match current {
+        Some(path) => SaveTarget::Replace(path.to_path_buf()),
+        None => SaveTarget::Create(new_path()),
+    }
+}
+
+/// « Enregistrer comme nouvelle version »: `a.png` → `a (2).png`, `a (2).png` → `a (3).png`.
+pub fn version_path(
+    current: &std::path::Path,
+    exists: impl Fn(&std::path::Path) -> bool,
+) -> std::path::PathBuf {
+    let dir = current.parent().unwrap_or(std::path::Path::new(""));
+    let ext = current
+        .extension()
+        .map(|e| e.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "png".into());
+    let stem = current
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    // « a (2) » is a version of « a »: the next one is « a (3) », not « a (2) (2) ».
+    let base = match stem.rsplit_once(" (") {
+        Some((head, tail))
+            if tail.ends_with(')')
+                && tail[..tail.len() - 1].chars().all(|c| c.is_ascii_digit()) =>
+        {
+            head.to_string()
+        }
+        _ => stem,
+    };
+    crate::output::filename::unique_path(dir, &base, &ext, exists)
+}
+
+/// The format a file name asks for, by its extension (PNG when unknown).
+pub fn format_for(path: &std::path::Path) -> crate::settings::model::ImageFormat {
+    use crate::settings::model::ImageFormat;
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("jpg" | "jpeg") => ImageFormat::Jpg,
+        Some("webp") => ImageFormat::Webp,
+        _ => ImageFormat::Png,
+    }
+}
+
+/// Writes the image to `path` in the format of its extension, through a temporary file.
+fn write_image(path: &std::path::Path, img: &image::RgbaImage) -> KResult<()> {
+    let bytes = crate::output::encode::encode(img, format_for(path))?;
+    let dir = path.parent().unwrap_or(std::path::Path::new("."));
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    crate::history::index::write_atomic(dir, &name, &bytes).map_err(|e| {
+        KirishotError::new(
+            ErrorCode::Save,
+            format!("Impossible d'enregistrer la capture : {}", e.message),
+        )
+    })
+}
+
 /// What the editor asks for with its exported image.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExportIntent {
     Copy,
+    /// Create the file, or replace the capture's file.
     Save,
+    /// A new file next to the capture's file: « … (2) ».
+    SaveVersion,
     SaveAs,
     CopyAndClose,
 }
@@ -363,6 +471,7 @@ pub fn parse_intent(header: Option<&str>) -> KResult<ExportIntent> {
         Some("copy") => Ok(ExportIntent::Copy),
         Some("save") => Ok(ExportIntent::Save),
         Some("saveAs") => Ok(ExportIntent::SaveAs),
+        Some("saveVersion") => Ok(ExportIntent::SaveVersion),
         Some("copyAndClose") => Ok(ExportIntent::CopyAndClose),
         other => Err(KirishotError::new(
             ErrorCode::InvalidSelection,
@@ -406,6 +515,48 @@ mod tests {
     fn parse_intent_rejects_missing_or_unknown() {
         assert!(parse_intent(None).is_err());
         assert!(parse_intent(Some("print")).is_err());
+    }
+
+    #[test]
+    fn save_replaces_the_known_file_even_if_deleted() {
+        let p = std::path::PathBuf::from(r"C:\x\a.png");
+        let q = std::path::PathBuf::from(r"C:\x\b.png");
+        assert_eq!(
+            save_target(Some(&p), || q.clone()),
+            SaveTarget::Replace(p.clone())
+        );
+        assert_eq!(
+            save_target(None, || q.clone()),
+            SaveTarget::Create(q.clone())
+        );
+    }
+
+    #[test]
+    fn a_new_version_goes_next_to_the_file() {
+        use std::path::{Path, PathBuf};
+        let taken = |names: &'static [&'static str]| {
+            move |p: &Path| names.iter().any(|n| p.file_name().is_some_and(|f| f == *n))
+        };
+        assert_eq!(
+            version_path(Path::new(r"C:\x\a.png"), taken(&["a.png"])),
+            PathBuf::from(r"C:\x\a (2).png")
+        );
+        assert_eq!(
+            version_path(Path::new(r"C:\x\a (2).png"), taken(&["a.png", "a (2).png"])),
+            PathBuf::from(r"C:\x\a (3).png")
+        );
+        assert_eq!(
+            version_path(Path::new(r"C:\x\shot.jpg"), taken(&["shot.jpg"])),
+            PathBuf::from(r"C:\x\shot (2).jpg")
+        );
+    }
+
+    #[test]
+    fn parse_intent_reads_save_version() {
+        assert_eq!(
+            parse_intent(Some("saveVersion")).unwrap(),
+            ExportIntent::SaveVersion
+        );
     }
 
     #[test]

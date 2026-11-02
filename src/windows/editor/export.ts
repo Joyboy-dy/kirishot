@@ -5,7 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { Doc, Rect } from '@/editor/document';
 import type { ExportResult } from '@/lib/ipc';
 
-export type ExportIntent = 'copy' | 'save' | 'saveAs' | 'copyAndClose';
+export type ExportIntent = 'copy' | 'save' | 'saveVersion' | 'saveAs' | 'copyAndClose';
 
 /** The part of the image that is exported: the crop, or the whole image. */
 export function exportRect(doc: Doc): Rect {
@@ -48,9 +48,16 @@ export async function exportImage(
   stage: Konva.Stage,
   doc: Doc,
   intent: ExportIntent,
+  file: { path: string | null; name: string | null } = { path: null, name: null },
 ): Promise<ExportResult> {
   const png = await renderPng(stage, doc);
+  // Headers are ASCII: the path and the name are percent-encoded (Rust decodes them).
   return invoke<ExportResult>('editor_export', png, {
-    headers: { 'x-kirishot-intent': intent, 'x-kirishot-capture': doc.captureId },
+    headers: {
+      'x-kirishot-intent': intent,
+      'x-kirishot-capture': doc.captureId,
+      'x-kirishot-path': encodeURIComponent(file.path ?? ''),
+      'x-kirishot-name': encodeURIComponent(file.name ?? ''),
+    },
   });
 }

@@ -47,7 +47,7 @@ pub fn deliver(
         error: None,
     };
     if save {
-        match save_capture(app, &settings, img, meta, &mut png) {
+        match save_capture(app, &settings, img, meta, &mut png, None) {
             Ok(saved) => delivery.saved = Some(saved),
             Err(e) => delivery.error = Some(e),
         }
@@ -86,8 +86,18 @@ pub fn save_image(
     img: &RgbaImage,
     meta: &CaptureMeta,
 ) -> KResult<SavedFile> {
+    save_image_named(app, img, meta, None)
+}
+
+/// Saves like `save_image`, with `stem` instead of the name template when given.
+pub fn save_image_named(
+    app: &tauri::AppHandle,
+    img: &RgbaImage,
+    meta: &CaptureMeta,
+    stem: Option<&str>,
+) -> KResult<SavedFile> {
     let settings = app.state::<SettingsState>().get();
-    save_capture(app, &settings, img, meta, &mut None)
+    save_capture(app, &settings, img, meta, &mut None, stem)
 }
 
 /// PNG bytes, encoded once and shared by saving and copying.
@@ -104,6 +114,7 @@ fn save_capture(
     img: &RgbaImage,
     meta: &CaptureMeta,
     png: &mut Option<Vec<u8>>,
+    stem: Option<&str>,
 ) -> KResult<SavedFile> {
     let default_folder = paths::default_save_folder(app)?;
     let preferred = resolve_save_folder(settings, &default_folder);
@@ -115,14 +126,17 @@ fn save_capture(
         encoded = encode::encode(img, format)?;
         &encoded
     };
-    let stem = render_name(
-        &settings.save.name_template,
-        &NameContext {
-            taken_at: meta.taken_at.naive_local(),
-            window_title: meta.window_title.clone(),
-            counter: settings.save.counter,
-        },
-    );
+    let stem = match stem {
+        Some(chosen) => filename::sanitize(chosen),
+        None => render_name(
+            &settings.save.name_template,
+            &NameContext {
+                taken_at: meta.taken_at.naive_local(),
+                window_title: meta.window_title.clone(),
+                counter: settings.save.counter,
+            },
+        ),
+    };
     let saved = save_bytes(
         bytes,
         &preferred,

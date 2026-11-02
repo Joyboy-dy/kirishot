@@ -112,6 +112,10 @@ export type EditorSession = {
 	width: number,
 	height: number,
 	title: string,
+	/**  The file the capture was last saved to (by the thumbnail or an earlier edit). */
+	savedPath: string | null,
+	/**  The autosaved document, when the capture is reopened from the history. */
+	document: string | null,
 };
 
 export type EditorSettings = {

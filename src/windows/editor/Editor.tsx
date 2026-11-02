@@ -5,6 +5,7 @@ import {
   duplicate,
   newDoc,
   newId,
+  normalizeDoc,
   remove,
   reorder,
   setCrop,
@@ -25,6 +26,7 @@ import { ContextBubble } from './ContextBubble';
 import { exportImage, type ExportIntent } from './export';
 import { buttonView, closeAfterCopy, FEEDBACK, messageVisible, type ButtonState } from './feedback';
 import { keyAction, type EditorAction } from './keys';
+import { saveState, type SaveState } from './save';
 import { toolbarLayout } from './layout';
 import { StatusBar } from './StatusBar';
 import type { Style } from './StylePopover';
@@ -40,6 +42,16 @@ import { useEditorSession } from './useEditorSession';
 import { fit, zoomAt, type View } from './viewport';
 
 type ExportButton = 'copy' | 'save' | 'main';
+
+/** A document autosaved earlier, or `null` when it is unreadable or of another capture. */
+function parseDoc(json: string, captureId: string): Doc | null {
+  try {
+    const doc = normalizeDoc(JSON.parse(json) as Doc);
+    return doc.captureId === captureId ? doc : null;
+  } catch {
+    return null;
+  }
+}
 const IDLE: ButtonState = { phase: 'idle', since: 0 };
 const ALL_IDLE: Record<ExportButton, ButtonState> = { copy: IDLE, save: IDLE, main: IDLE };
 
@@ -91,15 +103,25 @@ export function Editor() {
   // A new capture: fresh document and fitted view, set while rendering (React's pattern for
   // state that follows a prop), once the box has a size.
   const [shownId, setShownId] = useState<string | null>(null);
+  // The file this capture was saved to, the document it then had, and a name chosen before the
+  // first save (spec J3 § 3.2, § 3.3).
+  const [savedPath, setSavedPath] = useState<string | null>(null);
+  const [savedDoc, setSavedDoc] = useState<Doc | null>(null);
+  const [pendingName, setPendingName] = useState<string | null>(null);
   // For callbacks that end after another capture may have arrived.
   const shownRef = useRef(shownId);
   useLayoutEffect(() => {
     shownRef.current = shownId;
   });
   if (loaded && box.width > 0 && loaded.session.captureId !== shownId) {
-    const { captureId, width, height } = loaded.session;
+    const { captureId, width, height, savedPath: knownPath, document } = loaded.session;
+    // Reopened from the history: its annotations come back, still editable.
+    const opened = (document && parseDoc(document, captureId)) || newDoc(captureId, width, height);
     setShownId(captureId);
-    setHistory(init(newDoc(captureId, width, height)));
+    setHistory(init(opened));
+    setSavedPath(knownPath);
+    setSavedDoc(knownPath ? opened : null);
+    setPendingName(null);
     setMessage(null);
     setButtons(ALL_IDLE);
     setSelected([]);
@@ -123,6 +145,7 @@ export function Editor() {
   useAutosave(doc);
   const image = doc ? doc.size : { w: 1, h: 1 };
   const record = (next: Doc) => setHistory((h) => h && commit(h, next));
+  const currentSave: SaveState = doc ? saveState(doc, savedDoc, savedPath) : 'never';
   const fitView = () => {
     if (doc) setView(fit({ w: doc.size.w, h: doc.size.h }, box));
   };
@@ -165,12 +188,21 @@ export function Editor() {
     mark('busy');
     // Copy and close: copy, show the check, then close (closing at once would hide it).
     const exportedId = doc.captureId;
-    exportImage(stage, doc, intent === 'copyAndClose' ? 'copy' : intent)
+    const exportedDoc = doc;
+    exportImage(stage, doc, intent === 'copyAndClose' ? 'copy' : intent, {
+      path: savedPath,
+      name: pendingName,
+    })
       .then((r) => {
         // Another capture arrived meanwhile: this result is not about what is shown.
         if (!closeAfterCopy(exportedId, shownRef.current)) return;
         if (r.cancelled) return mark('idle');
         mark('done');
+        if (r.saved) {
+          setSavedPath(r.saved);
+          setSavedDoc(exportedDoc);
+          setPendingName(null);
+        }
         const name = r.saved?.split(/[\\/]/).pop() ?? '';
         const text = r.saved
           ? r.usedFallback
@@ -257,8 +289,11 @@ export function Editor() {
         if (cropDraft) return changeTool('select');
         if (selected.length > 0) return setSelected([]);
         return void commands.editorClose();
-      case 'copy':
       case 'save':
+        // Nothing changed since the last save: no second identical file (spec J3 § 3.2).
+        if (currentSave === 'clean') return;
+        return runExport('save');
+      case 'copy':
       case 'saveAs':
       case 'copyAndClose':
         return runExport(action.type);

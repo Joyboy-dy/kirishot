@@ -198,9 +198,37 @@ pub async fn editor_export(
         ));
     };
     let png = png.clone();
-    tauri::async_runtime::spawn_blocking(move || editor::export(&app, &capture_id, intent, png))
-        .await
-        .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))?
+    // The file the capture was saved to, and a name chosen before the first save.
+    let current = header("x-kirishot-path")
+        .and_then(|p| percent_decode(&p))
+        .filter(|p| !p.is_empty())
+        .map(std::path::PathBuf::from);
+    let name = header("x-kirishot-name")
+        .and_then(|n| percent_decode(&n))
+        .filter(|n| !n.trim().is_empty());
+    tauri::async_runtime::spawn_blocking(move || {
+        editor::export(&app, &capture_id, intent, png, current, name)
+    })
+    .await
+    .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))?
+}
+
+/// Headers carry ASCII only: the page sends paths and names percent-encoded.
+fn percent_decode(s: &str) -> Option<String> {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).ok()?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
 }
 
 /// Saves the editor's document (JSON) beside the original.
@@ -492,6 +520,16 @@ pub fn export_bindings(builder: &Builder<tauri::Wry>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn percent_decode_reads_encoded_paths() {
+        assert_eq!(
+            percent_decode("C%3A%5CImages%5CKirishot%20%C3%A0.png").as_deref(),
+            Some(r"C:\Images\Kirishot à.png")
+        );
+        assert_eq!(percent_decode("abc").as_deref(), Some("abc"));
+        assert_eq!(percent_decode("%ZZ"), None);
+    }
 
     // One test only: two tests writing the same bindings file in parallel would race.
     #[test]
