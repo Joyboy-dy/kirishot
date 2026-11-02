@@ -219,6 +219,8 @@ On épingle depuis la vignette, l'éditeur ou l'historique.
 
 ### 3.8 Historique (plan de travail « Historique »)
 
+> Modifié par J3 (l'historique arrive en J3, sans épingles) : voir `2026-11-02-kirishot-j3-application-design.md`.
+
 Il est dans la fenêtre principale, avec une barre latérale Historique / Réglages, un bouton « Nouvelle capture » et la version de l'application.
 
 - **Une grille groupée par jour** (Aujourd'hui, Hier, puis la date). Chaque carte affiche une miniature et un badge « Enregistrée » ou « Copiée ».
@@ -409,6 +411,8 @@ Kirishot n'utilise pas l'historique du presse-papiers de Windows : il garde son 
 - Les écrans non choisis sont libérés dès la validation de la sélection.
 
 ### 6.2 Historique sur le disque
+
+> Modifié par J3 (miniature en JPEG `thumb.jpg`) : voir `2026-11-02-kirishot-j3-application-design.md`.
 
 ```
 %APPDATA%\Kirishot\

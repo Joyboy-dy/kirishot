@@ -229,6 +229,8 @@ La règle est globale : tout élément interactif (`button`, `a`, `[role=button]
 
 ## 9. Jalons suivants (redécoupage)
 
+> Modifié par J3 (J3 devient l'application aboutie ; Projecteur, Loupe, flou et Embellir passent en J4) : voir `2026-11-02-kirishot-j3-application-design.md`.
+
 | Jalon | Contenu |
 |---|---|
 | **J2** (ce document) | Finitions de la sélection, son, flash, vignette, éditeur avec les outils essentiels. |

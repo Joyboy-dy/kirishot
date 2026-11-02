@@ -41,6 +41,8 @@ Chaque option affichée agit vraiment ; le texte s'ajoute et se modifie de faço
 
 ### 2.1 Modes
 
+> Modifié par J3 (mémoire du mode selon `capture.startMode`) : voir `2026-11-02-kirishot-j3-application-design.md`.
+
 | Mode | Survol | Clic sans glisser | Glisser |
 |---|---|---|---|
 | Zone | rien n'est surligné | rien | trace la zone |
@@ -66,6 +68,8 @@ Chaque option affichée agit vraiment ; le texte s'ajoute et se modifie de faço
 ## 3. Éditeur : outils et bulle
 
 ### 3.1 Règle
+
+> Modifié par J3 (plus de bulle, réglages et actions dans la barre du haut) : voir `2026-11-02-kirishot-j3-application-design.md`.
 
 Une option n'apparaît que si elle agit sur l'élément. La barre du haut montre les réglages de l'outil actif, ou ceux de la sélection en mode Sélection. La bulle montre les réglages de la sélection ; avec plusieurs éléments, seulement ceux qu'ils ont tous. La table ci-dessous est la source unique (`src/windows/editor/tools/options.ts`), testée.
 

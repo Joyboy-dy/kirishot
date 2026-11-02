@@ -117,3 +117,50 @@
 72. Liste des raccourcis ouverte en mode Fenêtre : un clic à côté la ferme sans capturer de fenêtre.
 73. Éditeur à 1 200 px avec l'outil Rectangle : la barre complète ne déborde pas sur les outils ni sur les boutons (sinon elle passe en version compacte).
 74. Curseur d'opacité glissé de 100 à 30 % sur une sélection : un seul Ctrl+Z revient à 100 %. Une flèche ou un rectangle rempli à 50 % s'éclaircit d'un bloc, sans contour plus foncé ni recouvrement visible.
+
+## J3 : une application aboutie
+
+### Lancement
+
+75. Installer avec « Lancer Kirishot » coché, puis Terminer : la fenêtre principale s'ouvre sur l'Historique.
+76. Lancer Kirishot depuis le menu Démarrer alors qu'il tourne déjà : la fenêtre s'ouvre (pas de seconde icône).
+77. Fermer la session puis la rouvrir : Kirishot démarre seul, sans fenêtre, dans la zone de notification. Gestionnaire des tâches › Démarrage : Kirishot y figure ; décocher « Lancer au démarrage » l'en retire, le recocher l'y remet.
+
+### Capture
+
+78. Mode au début « Zone » : choisir W pendant une capture, valider, relancer Win + Maj + S : la capture suivante démarre en Zone. « Fenêtre » démarre toujours en Fenêtre ; « Dernier utilisé » reprend le dernier mode.
+79. La barre de capture montre Annuler en croix seule, avec l'info-bulle « Annuler · Échap ».
+80. « Inclure le pointeur » activé : le pointeur apparaît dans l'image (une seule fois, pas sur l'écran figé) ; désactivé, il n'y est pas.
+
+### Historique
+
+81. Chaque nouvelle capture apparaît en tête de l'Historique, avec sa miniature, son heure, ses dimensions et ses badges (Copiée, Enregistrée quand le compte à rebours finit, Annotée après un export depuis l'éditeur).
+82. Groupes Aujourd'hui, Hier puis la date ; recherche par nom de fichier, titre de fenêtre (sans accents) et date « 02/11/2026 » ; filtres Tout, Enregistrées, Copiées, Annotées.
+83. Copier, Éditer (les annotations reviennent, encore modifiables), Afficher dans l'Explorateur, Supprimer (confirmation dans la carte) : Supprimer ne touche pas au fichier du dossier Images.
+84. « Vider l'historique… » demande confirmation et vide la page ; les fichiers enregistrés restent. Le pied indique le nombre, la taille et la durée de conservation.
+85. Les captures de J2 (dossier `captures`) apparaissent dans l'Historique après la mise à jour.
+
+### Éditeur : enregistrement et fermeture
+
+86. Plus de bulle flottante : avec une sélection, la barre du haut montre ses réglages puis Premier plan, Arrière-plan, Dupliquer, Supprimer (Ctrl+], Ctrl+[, Ctrl+D, Suppr).
+87. Enregistrer une capture : le bouton se grise (« Déjà enregistrée, aucune modification ») et Ctrl+S ne fait rien. Une modification le réactive ; Ctrl+Z jusqu'à l'état enregistré le grise à nouveau.
+88. Après une modification, Enregistrer remplace le même fichier (un seul fichier dans le dossier). Le menu propose « Enregistrer comme nouvelle version » (crée « … (2) ») et « Enregistrer sous… ».
+89. Une capture déjà enregistrée par la vignette arrive dans l'éditeur avec le bouton Enregistrer grisé.
+90. Nom dans la barre d'état : avant l'enregistrement il est atténué ; un clic ou F2 permet de le changer, Entrée valide, Échap annule. Le premier enregistrement utilise ce nom ; ensuite le fichier est renommé sur le disque.
+91. Noms refusés avec un message : vide, « a:b », « CON », un nom déjà pris. Changer seulement la casse est accepté.
+92. Capture modifiée puis ×, Alt+F4 ou Échap sans sélection : la boîte « Enregistrer les modifications ? » s'ouvre. Enregistrer enregistre puis ferme ; Ne pas enregistrer ferme (l'Historique garde les annotations) ; Annuler ou Échap laisse l'éditeur ouvert. « Copier et fermer » ne demande rien.
+93. Éditeur ouvert sur une capture modifiée, nouvelle capture avec « Toujours ouvrir l'éditeur » ou « Modifier » sur une vignette : la même boîte s'ouvre avant de remplacer la capture.
+94. « Ne plus demander » cochée puis Ne pas enregistrer : la boîte ne revient plus ; Réglages › Après capture › Éditeur la rétablit.
+
+### Éditeur : couleurs
+
+95. « + » après la palette : choisir une couleur dans le sélecteur ou taper un code (« abc », « #A1B2C3 ») ; elle s'applique et entre dans les récentes (8 au plus, la dernière en tête).
+96. Pipette (bouton ou touche I) : prendre une couleur dans l'image, puis dans une autre application ; Échap annule.
+
+### Fenêtre principale
+
+97. Barre latérale : Nouvelle capture (la fenêtre s'efface, la capture démarre), Historique, Raccourcis, Réglages, À propos (version, licence, dépôt, dossier des journaux).
+98. Raccourcis : cliquer sur « Capture de zone », presser une combinaison (Win + Maj + A, Ctrl + Alt + F9…) ; elle marche aussitôt. Une combinaison prise par une autre application s'affiche en rouge et l'ancienne reste active. La même combinaison sur deux lignes est refusée. « Aucun » et « Par défaut » marchent. Échap annule l'attente.
+99. Réglages en quatre onglets : chaque réglage affiché agit ; le modèle de nom montre un aperçu qui suit la saisie, les jetons s'insèrent au curseur.
+100. Thème Clair, Sombre, Comme Windows : la fenêtre principale, l'éditeur et les vignettes suivent aussitôt ; l'écran de sélection reste sombre.
+101. Espacements des réglages : titre de section, puis un vrai espace avant la carte ; lignes aérées, libellés et contrôles alignés.
