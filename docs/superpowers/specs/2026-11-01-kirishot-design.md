@@ -109,6 +109,8 @@ Tous les raccourcis se modifient dans Réglages › Raccourcis.
 
 ### 3.2 Sélection (plan de travail « Sélection de zone »)
 
+> **Modifié par J2** : voir `2026-11-02-kirishot-usage-quotidien-design.md`, § 8.
+
 Au raccourci, tous les écrans sont capturés en même temps. Une fenêtre de sélection plein écran s'affiche ensuite sur chaque écran, avec l'image figée assombrie.
 
 - **Zone** (mode par défaut) :
@@ -136,6 +138,8 @@ Au raccourci, tous les écrans sont capturés en même temps. Une fenêtre de s�
 - **Une sélection reste sur un seul écran.**
 
 ### 3.3 Vignette flottante (plan de travail « Vignettes flottantes »)
+
+> **Modifié par J2** : voir `2026-11-02-kirishot-usage-quotidien-design.md`, § 8.
 
 Après une capture de zone, de fenêtre ou d'écran, une vignette apparaît en bas à droite de l'écran où la capture a été faite.
 
@@ -170,6 +174,8 @@ Le raccourci OCR, ou le bouton Texte de la barre, ouvre la sélection en mode Te
 - Une capture de texte n'est pas enregistrée dans l'historique des images.
 
 ### 3.6 Éditeur (plan de travail « Éditeur »)
+
+> **Modifié par J2** : voir `2026-11-02-kirishot-usage-quotidien-design.md`, § 8.
 
 L'éditeur est une fenêtre normale, redimensionnable. Son titre est « Capture du 01/11/2026 à 14:32 ».
 
@@ -224,6 +230,8 @@ Il est dans la fenêtre principale, avec une barre latérale Historique / Régla
 
 ### 3.9 Réglages (plan de travail « Réglages »)
 
+> **Modifié par J2** : voir `2026-11-02-kirishot-usage-quotidien-design.md`, § 8.
+
 Les onglets sont Général, Raccourcis, Capture, Historique et À propos.
 
 - **Général**
@@ -240,7 +248,7 @@ Les onglets sont Général, Raccourcis, Capture, Historique et À propos.
   - Une combinaison déjà prise s'affiche en rouge avec « Déjà utilisé par une autre application ».
 - **Capture**
   - Inclure le curseur (désactivé par défaut).
-  - Son de capture (désactivé par défaut).
+  - Son de capture (activé par défaut).
   - Durée du retardateur proposée dans la zone de notification.
   - Capturer dès le relâchement (désactivé par défaut).
 - **Historique** : durée de conservation (7, 30 ou 90 jours, ou illimitée ; 30 par défaut), emplacement, et Vider.
@@ -444,6 +452,8 @@ Kirishot n'utilise pas l'historique du presse-papiers de Windows : il garde son 
 
 ### 7.1 Réglages (`settings.json`, version 1)
 
+> **Modifié par J2** : voir `2026-11-02-kirishot-usage-quotidien-design.md`, § 8.
+
 ```json
 {
   "version": 1,
@@ -460,7 +470,7 @@ Kirishot n'utilise pas l'historique du presse-papiers de Windows : il garde son 
   },
   "capture": {
     "includeCursor": false,
-    "sound": false,
+    "sound": true,
     "trayTimerSeconds": 3,
     "commitOnRelease": false
   },
@@ -693,6 +703,8 @@ Le code du spike est jetable. Seules les mesures et la décision sont gardées, 
 ---
 
 ## 14. Découpage en jalons
+
+> **Redécoupé après J1** : J2 est le jalon « Usage quotidien » (`2026-11-02-kirishot-usage-quotidien-design.md`), qui avance la vignette et l'éditeur. Le nouveau découpage est au § 9 de ce document ; le tableau ci-dessous est celui d'origine.
 
 La v1 est trop grosse pour un seul plan d'implémentation. Elle est construite en jalons, et chacun laisse une application utilisable. Chaque jalon reçoit son propre plan, écrit au moment de le commencer.
 
