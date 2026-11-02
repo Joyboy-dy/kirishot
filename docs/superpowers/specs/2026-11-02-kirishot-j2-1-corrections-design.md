@@ -87,7 +87,7 @@ Premier plan, arrière-plan et supprimer sont toujours proposés. Les options s'
 - **Texte** : le champ s'ouvre au relâchement (`pointerup`) et prend le focus après le rendu ; le `mousedown` qui le crée empêche l'action par défaut. Échap, Ctrl+Entrée ou un clic ailleurs valident ; Entrée seule va à la ligne. Un double-clic (outil Sélection) ou un clic sur un texte avec l'outil Texte le modifie. Un texte vide à la validation est supprimé.
 - **Flèche** : rendue en deux parties, un trait (droit ou courbe, `lineCap` rond, motif de tirets possible) et une pointe pleine. La géométrie de la pointe reste celle de `arrowOutline` ; le contour blanc est conservé.
 - **Points** : motif `[0, 2w]` avec `lineCap: 'round'` ; tirets `[3w, 2w]`. Pour les rectangles et ellipses, les mêmes valeurs.
-- **Opacité** : un curseur de 10 à 100 %, appliqué à tout l'élément (trait et remplissage ensemble, propriété `opacity` du nœud) ; le surligneur garde son mode `multiply` sous l'opacité.
+- **Opacité** : un curseur de 10 à 100 %, appliqué à tout l'élément (trait et remplissage ensemble, propriété `opacity` du nœud), pour chaque élément qui le propose dans la table du § 3.1 ; le surligneur garde son mode `multiply` sous l'opacité.
 - **Surligneur** : gagne un champ `opacity` (défaut 1) ; sa couleur et son épaisseur sont modifiables après coup.
 - **Pixelisation** : champ `block` (8, 16 ou 28 px ; défaut 16, « moyenne »).
 - **Bulle** : placée sous la sélection, au-dessus si elle n'a pas la place, bornée horizontalement à la zone de l'image avec 8 px de marge ; si elle est plus large que la zone, elle passe sur deux lignes. Le calcul est une fonction pure testée (`bubblePlacement`).
