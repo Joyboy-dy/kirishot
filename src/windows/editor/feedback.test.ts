@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buttonView, FEEDBACK, messageVisible } from './feedback';
+import { buttonView, closeAfterCopy, FEEDBACK, messageVisible } from './feedback';
 
 describe('feedback', () => {
   it('keeps the spec timings', () => {
@@ -31,5 +31,13 @@ describe('feedback', () => {
     expect(messageVisible({ error: false, at: 1000 }, 5000)).toBe(false);
     expect(messageVisible({ error: true, at: 1000 }, 61000)).toBe(true);
     expect(messageVisible(null, 0)).toBe(false);
+  });
+});
+
+describe('closeAfterCopy', () => {
+  it('closes only if the editor still shows the capture that was copied', () => {
+    expect(closeAfterCopy('cap-1', 'cap-1')).toBe(true);
+    expect(closeAfterCopy('cap-1', 'cap-2')).toBe(false);
+    expect(closeAfterCopy('cap-1', null)).toBe(false);
   });
 });

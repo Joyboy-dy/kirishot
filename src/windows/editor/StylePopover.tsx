@@ -14,7 +14,10 @@ type ControlsProps = {
   options: Option[];
   /** What the controls show as active; a missing value shows nothing active. */
   value: StylePatch;
-  onChange(patch: StylePatch): void;
+  /** `live`: a change still in progress (the opacity slider being dragged). */
+  onChange(patch: StylePatch, live?: boolean): void;
+  /** The live change is over: it becomes one undo step. */
+  onSettled?(): void;
   /** Leave the colours out (shown elsewhere, as a swatch). */
   withoutColor?: boolean;
 };
@@ -101,7 +104,13 @@ export function Palette(p: { value?: string; onChange(color: string): void; smal
  * The controls of the options in `options`, in the table's order (spec J2.1 § 3.1). Shared by
  * the top bar, the « Style » menu and the selection bubble.
  */
-export function StyleControls({ options, value, onChange, withoutColor }: ControlsProps) {
+export function StyleControls({
+  options,
+  value,
+  onChange,
+  onSettled,
+  withoutColor,
+}: ControlsProps) {
   const groups: ReactNode[] = [];
   const has = (o: Option) => options.includes(o);
 
@@ -193,7 +202,10 @@ export function StyleControls({ options, value, onChange, withoutColor }: Contro
           max={100}
           step={5}
           value={Math.round((value.opacity ?? 1) * 100)}
-          onChange={(e) => onChange({ opacity: Number(e.target.value) / 100 })}
+          onChange={(e) => onChange({ opacity: Number(e.target.value) / 100 }, true)}
+          onPointerUp={() => onSettled?.()}
+          onKeyUp={() => onSettled?.()}
+          onBlur={() => onSettled?.()}
           aria-label={t('editor.opacity')}
           className="w-20 accent-[var(--k-accent)]"
         />
@@ -317,6 +329,7 @@ export function StyleMenu(p: ControlsProps & { iconOnly?: boolean }) {
         options={p.options}
         value={p.value}
         onChange={p.onChange}
+        onSettled={p.onSettled}
         withoutColor={p.withoutColor}
       />
     </Menu>

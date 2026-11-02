@@ -22,3 +22,8 @@ export function messageVisible(m: { error: boolean; at: number } | null, now: nu
   if (!m) return false;
   return m.error || now - m.at < FEEDBACK.messageMs;
 }
+
+/** « Copier et fermer » closes after the check only if no other capture arrived meanwhile. */
+export function closeAfterCopy(copiedId: string, shownId: string | null): boolean {
+  return copiedId === shownId;
+}

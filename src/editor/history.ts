@@ -21,3 +21,14 @@ export function redo(h: History): History {
   if (!next) return h;
   return { past: [...h.past, h.present], present: next, future };
 }
+
+/** A live change (a slider being dragged): the present moves, the history does not. */
+export function preview(h: History, next: Doc): History {
+  return { ...h, present: next };
+}
+
+/** Ends a live change started from `base`: the whole change is one undo step. */
+export function settle(h: History, base: Doc, limit = 200): History {
+  if (base === h.present) return h;
+  return { past: [...h.past, base].slice(-limit), present: h.present, future: [] };
+}

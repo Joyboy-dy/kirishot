@@ -44,3 +44,18 @@ describe('keyAction', () => {
   });
   it('other keys do nothing', () => expect(k('q')).toBeNull());
 });
+
+describe('keys already handled', () => {
+  it('a key a menu has handled (Échap closing it) does nothing in the editor', () => {
+    expect(
+      keyAction({
+        key: 'Escape',
+        ctrl: false,
+        shift: false,
+        alt: false,
+        editingText: false,
+        handled: true,
+      }),
+    ).toBeNull();
+  });
+});

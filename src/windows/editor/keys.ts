@@ -20,7 +20,15 @@ export type EditorAction =
         | 'escape';
     };
 
-type KeyInput = { key: string; ctrl: boolean; shift: boolean; alt: boolean; editingText: boolean };
+type KeyInput = {
+  key: string;
+  ctrl: boolean;
+  shift: boolean;
+  alt: boolean;
+  editingText: boolean;
+  /** Already handled by a control (`defaultPrevented`): Échap that closes a menu, for one. */
+  handled?: boolean;
+};
 
 const ARROWS: Record<string, [number, number]> = {
   ArrowLeft: [-1, 0],
@@ -31,7 +39,7 @@ const ARROWS: Record<string, [number, number]> = {
 
 export function keyAction(e: KeyInput): EditorAction | null {
   // While a text is edited, every key belongs to it; Échap and a click outside end the edit.
-  if (e.editingText) return null;
+  if (e.editingText || e.handled) return null;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   if (e.ctrl) {
     if (key === 'z') return { type: e.shift ? 'redo' : 'undo' };

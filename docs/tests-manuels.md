@@ -113,3 +113,7 @@
 68. Enregistrer : coche sur le bouton, « Enregistrée : <nom> » dans la barre d'état, effacé après 4 s. Une erreur reste affichée jusqu'à l'action suivante.
 69. Copier et fermer : la coche se voit brièvement, puis la fenêtre se ferme.
 70. Aucun flash ni saut de l'image au clic sur Copier ou Enregistrer, y compris zoomé et après un recadrage ; l'image exportée garde la pleine résolution du recadrage.
+71. Fenêtre de l'éditeur sous 1 100 px : ouvrir « Style » ou la pastille de couleur, puis Échap : seul le menu se ferme, l'éditeur et la capture restent.
+72. Liste des raccourcis ouverte en mode Fenêtre : un clic à côté la ferme sans capturer de fenêtre.
+73. Éditeur à 1 200 px avec l'outil Rectangle : la barre complète ne déborde pas sur les outils ni sur les boutons (sinon elle passe en version compacte).
+74. Curseur d'opacité glissé de 100 à 30 % sur une sélection : un seul Ctrl+Z revient à 100 %. Une flèche ou un rectangle rempli à 50 % s'éclaircit d'un bloc, sans contour plus foncé ni recouvrement visible.

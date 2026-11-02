@@ -88,6 +88,20 @@ export function sheetKey(key: string, open: boolean): 'toggle' | 'close' | null 
   return null;
 }
 
+/**
+ * A pointer event while the shortcut sheet is open, or right after a press closed it: the press
+ * closes the sheet and neither it nor its release may reach the selection (no capture).
+ */
+export function sheetPointer(
+  phase: 'down' | 'up',
+  open: boolean,
+  closedByPress: boolean,
+): 'close' | 'swallow' | null {
+  if (phase === 'down' && open) return 'close';
+  if (phase === 'up' && closedByPress) return 'swallow';
+  return null;
+}
+
 /** A window title cut to `max` characters, ellipsis included. */
 export function truncateTitle(title: string, max = 60): string {
   return title.length <= max ? title : `${title.slice(0, max - 1)}…`;

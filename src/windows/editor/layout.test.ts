@@ -10,3 +10,15 @@ describe('toolbarLayout', () => {
     expect(toolbarLayout(520)).toBe('narrow');
   });
 });
+
+describe('toolbarLayout with a measured overflow', () => {
+  it('stays compact until the width where the full bar overflowed is passed', () => {
+    expect(toolbarLayout(1200, 1340)).toBe('compact');
+    expect(toolbarLayout(1340, 1340)).toBe('full');
+    expect(toolbarLayout(900, 1340)).toBe('compact');
+  });
+
+  it('never goes full below 1 100 px', () => {
+    expect(toolbarLayout(1050, 1000)).toBe('compact');
+  });
+});

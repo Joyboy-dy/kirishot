@@ -2,8 +2,12 @@
 
 export type ToolbarLayout = 'full' | 'compact' | 'narrow';
 
-export function toolbarLayout(width: number): ToolbarLayout {
-  if (width >= 1100) return 'full';
+/**
+ * `fullFrom`: the width from which the full bar fits, raised when it was seen to overflow (its
+ * style options are wider for some tools); never below the spec's 1 100 px.
+ */
+export function toolbarLayout(width: number, fullFrom = 1100): ToolbarLayout {
+  if (width >= Math.max(1100, fullFrom)) return 'full';
   if (width >= 760) return 'compact';
   return 'narrow';
 }

@@ -17,6 +17,7 @@ import { stepNumber, type Annotation, type Doc, type Point } from '@/editor/docu
 import { arrowParts } from '@/editor/geometry';
 import { pixelateBlocks } from '@/editor/pixelate';
 import { dashFor } from './dash';
+import { opacityProps } from './opacity';
 
 export type NodeEvents = {
   draggable: boolean;
@@ -111,44 +112,66 @@ export function AnnotationNode({
 
   switch (a.tool) {
     case 'arrow': {
-      // A stroked shaft (dashes and dots apply) under a solid head, both with a white edge.
+      // One shape (so its opacity applies to the whole arrow): a white-edged stroked shaft, where
+      // dashes and dots apply, under a solid head. A fill and a stroke are set so that Konva draws
+      // it through a buffer when translucent.
       const [from, to] = a.points;
       const { shaft, head } = arrowParts(from, to, a.control, a.stroke.width);
       const w = a.stroke.width;
       const edge = Math.max(1, w * 0.25);
-      const line = shaft.flatMap((p) => [p.x, p.y]);
-      const dash = dashFor(a.stroke.dash, w);
+      const dash = dashFor(a.stroke.dash, w) ?? [];
+      const trace = (ctx: Konva.Context, pts: Point[]) => {
+        ctx.beginPath();
+        pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      };
       return (
-        <Group {...common} baseX={0} baseY={0} opacity={a.stroke.opacity}>
-          <Line
-            points={line}
-            stroke="white"
-            strokeWidth={w + 2 * edge}
-            lineCap="round"
-            lineJoin="round"
-            dash={dash}
-            hitStrokeWidth={14}
-            {...(a.shadow ? SHADOW : {})}
-          />
-          <Line
-            points={line}
-            stroke={a.stroke.color}
-            strokeWidth={w}
-            lineCap="round"
-            lineJoin="round"
-            dash={dash}
-            hitStrokeWidth={14}
-          />
-          <Line
-            points={head.flatMap((p) => [p.x, p.y])}
-            closed
-            fill={a.stroke.color}
-            stroke="white"
-            strokeWidth={edge * 2}
-            lineJoin="round"
-            {...(a.shadow ? SHADOW : {})}
-          />
-        </Group>
+        <Shape
+          {...common}
+          {...opacityProps(a.stroke.opacity, true)}
+          baseX={0}
+          baseY={0}
+          fill={a.stroke.color}
+          stroke="white"
+          sceneFunc={(ctx, shape) => {
+            const k = shape.getAbsoluteScale().x;
+            const shadow = (on: boolean) => {
+              ctx.setAttr('shadowColor', on && a.shadow ? 'rgba(0, 0, 0, 0.35)' : 'transparent');
+              ctx.setAttr('shadowBlur', 6 * k);
+              ctx.setAttr('shadowOffsetY', 2 * k);
+            };
+            ctx.setAttr('lineCap', 'round');
+            ctx.setAttr('lineJoin', 'round');
+            ctx.setLineDash(dash);
+            shadow(true);
+            trace(ctx, shaft);
+            ctx.setAttr('strokeStyle', 'white');
+            ctx.setAttr('lineWidth', w + 2 * edge);
+            ctx.stroke();
+            shadow(false);
+            trace(ctx, shaft);
+            ctx.setAttr('strokeStyle', a.stroke.color);
+            ctx.setAttr('lineWidth', w);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            shadow(true);
+            fillPath(ctx, head);
+            ctx.setAttr('fillStyle', a.stroke.color);
+            ctx.fill();
+            ctx.setAttr('strokeStyle', 'white');
+            ctx.setAttr('lineWidth', edge * 2);
+            ctx.stroke();
+          }}
+          hitFunc={(ctx, shape) => {
+            // The hit area: the shaft stroked at hitStrokeWidth, and the head.
+            trace(ctx, shaft);
+            if (head.length > 0) {
+              ctx.moveTo(head[0].x, head[0].y);
+              head.slice(1).forEach((p) => ctx.lineTo(p.x, p.y));
+              ctx.closePath();
+            }
+            ctx.fillStrokeShape(shape);
+          }}
+        />
       );
     }
     case 'line':
@@ -177,7 +200,7 @@ export function AnnotationNode({
       const shape = {
         stroke: a.stroke.color,
         strokeWidth: a.stroke.width,
-        opacity: a.stroke.opacity,
+        ...opacityProps(a.stroke.opacity, fill !== undefined),
         dash: dashFor(a.stroke.dash, a.stroke.width),
         lineCap: 'round' as const,
         fill,

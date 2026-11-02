@@ -22,6 +22,7 @@ import {
   cursorFor,
   initialState,
   sheetKey,
+  sheetPointer,
   step,
   type Ctx,
   type Mode,
@@ -222,8 +223,15 @@ export function Overlay() {
     cssToPhysical({ x: e.clientX, y: e.clientY }, scale);
   const currentRect = 'rect' in sel ? sel.rect : null;
 
+  // A press outside the open shortcut sheet only closes it: no selection, no window capture.
+  const pressClosedSheet = useRef(false);
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
+    if (sheetPointer('down', sheetRef.current, false) === 'close') {
+      showSheet(false);
+      pressClosedSheet.current = true;
+      return;
+    }
     e.currentTarget.setPointerCapture(e.pointerId);
     const at = toPhysical(e);
     const handle = (e.target as HTMLElement).dataset.handle ?? null;
@@ -274,7 +282,13 @@ export function Overlay() {
           space: spaceRef.current,
         });
       }}
-      onPointerUp={(e) => dispatch({ type: 'pointerUp', at: toPhysical(e) })}
+      onPointerUp={(e) => {
+        if (sheetPointer('up', sheetRef.current, pressClosedSheet.current) === 'swallow') {
+          pressClosedSheet.current = false;
+          return;
+        }
+        dispatch({ type: 'pointerUp', at: toPhysical(e) });
+      }}
       onDoubleClick={(e) =>
         dispatch({
           type: 'doubleClick',

@@ -5,6 +5,7 @@ import {
   cursorFor,
   initialState,
   sheetKey,
+  sheetPointer,
   step,
   truncateTitle,
   type Ctx,
@@ -230,5 +231,20 @@ describe('selection', () => {
     expect(cursorFor(null, 'dragging', true, false)).toBe('grabbing');
     expect(cursorFor(null, 'adjusting', false, true)).toBe('move');
     expect(cursorFor(null, 'moving', false, true)).toBe('move');
+  });
+});
+
+describe('sheetPointer', () => {
+  it('a press while the sheet is open closes it and is not a capture click', () => {
+    expect(sheetPointer('down', true, false)).toBe('close');
+  });
+
+  it('the release of that press is swallowed too', () => {
+    expect(sheetPointer('up', false, true)).toBe('swallow');
+  });
+
+  it('with the sheet closed, the pointer goes to the selection', () => {
+    expect(sheetPointer('down', false, false)).toBeNull();
+    expect(sheetPointer('up', false, false)).toBeNull();
   });
 });

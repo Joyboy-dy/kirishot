@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { add, newDoc, type Annotation } from './document';
-import { commit, init, redo, undo } from './history';
+import { commit, init, preview, redo, settle, undo } from './history';
 
 const empty = newDoc('cap', 100, 100);
 const step = (id: string): Annotation => ({
@@ -33,5 +33,21 @@ describe('history', () => {
     const h = init(empty);
     expect(undo(h)).toBe(h);
     expect(redo(h)).toBe(h);
+  });
+});
+
+describe('preview and settle', () => {
+  it('a live change previewed many times is one undo step back to where it started', () => {
+    const a = newDoc('c', 10, 10);
+    const b = { ...a, crop: { x: 0, y: 0, width: 5, height: 5 } };
+    const c = { ...a, crop: { x: 0, y: 0, width: 4, height: 4 } };
+    let h = init(a);
+    h = preview(h, b);
+    h = preview(h, c);
+    expect(h.past).toEqual([]);
+    h = settle(h, a);
+    expect(h.present).toBe(c);
+    expect(undo(h).present).toBe(a);
+    expect(undo(undo(h)).present).toBe(a);
   });
 });

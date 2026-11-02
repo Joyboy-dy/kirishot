@@ -13,7 +13,8 @@ type Props = {
   sel: Rect;
   area: { width: number; height: number };
   value: StylePatch;
-  onStyle(patch: StylePatch): void;
+  onStyle(patch: StylePatch, live?: boolean): void;
+  onStyleSettled(): void;
   onFront(): void;
   onBack(): void;
   onDelete(): void;
@@ -75,7 +76,12 @@ export function ContextBubble(p: Props) {
     >
       {options.length > 0 && (
         <>
-          <StyleControls options={options} value={p.value} onChange={p.onStyle} />
+          <StyleControls
+            options={options}
+            value={p.value}
+            onChange={p.onStyle}
+            onSettled={p.onStyleSettled}
+          />
           <span className="mx-1 h-5 w-px shrink-0" style={{ background: 'var(--k-border)' }} />
         </>
       )}

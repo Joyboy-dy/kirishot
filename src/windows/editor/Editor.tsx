@@ -15,7 +15,7 @@ import {
   type Point,
   type Rect,
 } from '@/editor/document';
-import { commit, init, redo, undo, type History } from '@/editor/history';
+import { commit, init, preview, redo, settle, undo, type History } from '@/editor/history';
 import { PALETTE, strokeWidth } from '@/editor/style';
 import { commands } from '@/lib/ipc';
 import { t } from '@/i18n';
@@ -23,7 +23,7 @@ import { Canvas, type CanvasPointer } from './Canvas';
 import { useAutosave } from './autosave';
 import { ContextBubble } from './ContextBubble';
 import { exportImage, type ExportIntent } from './export';
-import { buttonView, FEEDBACK, messageVisible, type ButtonState } from './feedback';
+import { buttonView, closeAfterCopy, FEEDBACK, messageVisible, type ButtonState } from './feedback';
 import { keyAction, type EditorAction } from './keys';
 import { toolbarLayout } from './layout';
 import { StatusBar } from './StatusBar';
@@ -91,6 +91,11 @@ export function Editor() {
   // A new capture: fresh document and fitted view, set while rendering (React's pattern for
   // state that follows a prop), once the box has a size.
   const [shownId, setShownId] = useState<string | null>(null);
+  // For callbacks that end after another capture may have arrived.
+  const shownRef = useRef(shownId);
+  useLayoutEffect(() => {
+    shownRef.current = shownId;
+  });
   if (loaded && box.width > 0 && loaded.session.captureId !== shownId) {
     const { captureId, width, height } = loaded.session;
     setShownId(captureId);
@@ -159,8 +164,11 @@ export function Editor() {
     setMessage(null);
     mark('busy');
     // Copy and close: copy, show the check, then close (closing at once would hide it).
+    const exportedId = doc.captureId;
     exportImage(stage, doc, intent === 'copyAndClose' ? 'copy' : intent)
       .then((r) => {
+        // Another capture arrived meanwhile: this result is not about what is shown.
+        if (!closeAfterCopy(exportedId, shownRef.current)) return;
         if (r.cancelled) return mark('idle');
         mark('done');
         const name = r.saved?.split(/[\\/]/).pop() ?? '';
@@ -171,7 +179,9 @@ export function Editor() {
           : t('editor.copied');
         setMessage({ text, error: false, at: Date.now() });
         if (intent === 'copyAndClose')
-          window.setTimeout(() => void commands.editorClose(), FEEDBACK.closeDelayMs);
+          window.setTimeout(() => {
+            if (closeAfterCopy(exportedId, shownRef.current)) void commands.editorClose();
+          }, FEEDBACK.closeDelayMs);
       })
       .catch((e: unknown) => {
         mark('idle');
@@ -196,9 +206,20 @@ export function Editor() {
   };
 
   // A setting becomes the drawing style and, with a selection, applies to it in one undo step.
-  const changeStyle = (patch: StylePatch) => {
+  // A setting becomes the drawing style and, with a selection, applies to it in one undo step;
+  // a live change (the opacity slider being dragged) is one step from its start to its end.
+  const liveBase = useRef<Doc | null>(null);
+  const changeStyle = (patch: StylePatch, live = false) => {
     setStyle((s) => ({ ...s, ...patch }));
-    if (doc && selected.length > 0) record(applyStyle(doc, selected, patch));
+    if (!doc || selected.length === 0) return;
+    if (!live) return record(applyStyle(doc, selected, patch));
+    liveBase.current ??= doc;
+    setHistory((h) => h && preview(h, applyStyle(h.present, selected, patch)));
+  };
+  const settleStyle = () => {
+    const base = liveBase.current;
+    liveBase.current = null;
+    if (base) setHistory((h) => h && settle(h, base));
   };
 
   const act = (action: EditorAction) => {
@@ -247,7 +268,8 @@ export function Editor() {
   const keysRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useLayoutEffect(() => {
     keysRef.current = (e: KeyboardEvent) => {
-      if (editing) return;
+      // A key a control already handled (Échap closing a menu) must not act on the editor too.
+      if (editing || e.defaultPrevented) return;
       if (e.key === ' ' && !e.repeat) {
         setPanning(true);
         e.preventDefault();
@@ -271,6 +293,7 @@ export function Editor() {
         shift: e.shiftKey,
         alt: e.altKey,
         editingText: false,
+        handled: e.defaultPrevented,
       });
       if (!action) return;
       e.preventDefault();
@@ -421,6 +444,7 @@ export function Editor() {
         }}
         onTool={changeTool}
         onStyle={changeStyle}
+        onStyleSettled={settleStyle}
         onUndo={() => setHistory((h) => h && undo(h))}
         onRedo={() => setHistory((h) => h && redo(h))}
         onCopy={() => runExport('copy')}
@@ -519,6 +543,7 @@ export function Editor() {
             area={box}
             value={shownStyle}
             onStyle={changeStyle}
+            onStyleSettled={settleStyle}
             onFront={() => doc && record(selected.reduce((d, id) => reorder(d, id, 'front'), doc))}
             onBack={() =>
               doc && record([...selected].reverse().reduce((d, id) => reorder(d, id, 'back'), doc))

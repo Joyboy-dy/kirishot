@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, ClipboardCheck, Copy, Download, LoaderCircle, Redo2, Undo2 } from 'lucide-react';
 import { Tip } from '@/components/ui/Tip';
 import { t } from '@/i18n';
@@ -18,7 +18,8 @@ type Props = {
   /** What each export button shows: its icon, a spinner or a check (spec J2.1 § 4.2). */
   views: Record<'copy' | 'save' | 'main', 'icon' | 'spinner' | 'check'>;
   onTool(tool: ToolId): void;
-  onStyle(patch: StylePatch): void;
+  onStyle(patch: StylePatch, live?: boolean): void;
+  onStyleSettled(): void;
   onUndo(): void;
   onRedo(): void;
   onCopy(): void;
@@ -84,7 +85,18 @@ function useWidth() {
  * 1 100 px the style folds into menus, below 760 px the actions become icons (J2.1 § 4.1).
  */
 export function TopBar(p: Props) {
-  const layout = toolbarLayout(useWidth());
+  const width = useWidth();
+  // The full bar's style options are wider for some tools: where it was seen to overflow, the
+  // compact layout takes over up to that width (never a cut or scrolling bar).
+  const [fullFrom, setFullFrom] = useState(1100);
+  const layout = toolbarLayout(width, fullFrom);
+  const middle = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = middle.current;
+    if (layout !== 'full' || !el) return;
+    const extra = el.scrollWidth - el.clientWidth;
+    if (extra > 0) setFullFrom(width + extra + 16);
+  }, [layout, width, p.options]);
   const dense = layout === 'narrow';
   const hasColor = p.options.includes('color');
   const menuOptions = layout === 'compact' ? p.options.filter((o) => o !== 'color') : p.options;
@@ -109,15 +121,26 @@ export function TopBar(p: Props) {
         </BarButton>
       ))}
       <Divider />
-      <div className="flex min-w-0 flex-1 items-center justify-center gap-1">
+      <div ref={middle} className="flex min-w-0 flex-1 items-center justify-center gap-1">
         {layout === 'full' && (
-          <StyleControls options={p.options} value={p.value} onChange={p.onStyle} />
+          <StyleControls
+            options={p.options}
+            value={p.value}
+            onChange={p.onStyle}
+            onSettled={p.onStyleSettled}
+          />
         )}
         {layout === 'compact' && hasColor && (
           <ColorMenu value={p.value.color} onChange={(color) => p.onStyle({ color })} />
         )}
         {layout !== 'full' && menuOptions.length > 0 && (
-          <StyleMenu options={menuOptions} value={p.value} onChange={p.onStyle} iconOnly={dense} />
+          <StyleMenu
+            options={menuOptions}
+            value={p.value}
+            onChange={p.onStyle}
+            onSettled={p.onStyleSettled}
+            iconOnly={dense}
+          />
         )}
       </div>
       <Divider />
