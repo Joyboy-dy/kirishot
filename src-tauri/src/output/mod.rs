@@ -13,6 +13,7 @@ use crate::settings::{SettingsState, resolve_save_folder};
 use filename::{NameContext, render_name};
 use save::{SavedFile, save_bytes};
 
+#[derive(Clone)]
 pub struct CaptureMeta {
     pub taken_at: chrono::DateTime<chrono::Local>,
     pub window_title: Option<String>,

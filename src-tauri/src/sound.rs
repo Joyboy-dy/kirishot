@@ -73,7 +73,10 @@ fn shutter_samples() -> Vec<i16> {
             (low + tone) * env * fade
         })
         .collect();
-    let peak = raw.iter().fold(0.0f32, |m, s| m.max(s.abs())).max(f32::EPSILON);
+    let peak = raw
+        .iter()
+        .fold(0.0f32, |m, s| m.max(s.abs()))
+        .max(f32::EPSILON);
     let gain = 0.5 * i16::MAX as f32 / peak;
     raw.iter().map(|s| (s * gain).round() as i16).collect()
 }

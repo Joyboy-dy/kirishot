@@ -11,6 +11,9 @@ mod notify;
 mod output;
 mod paths;
 mod settings;
+// Wired to the thumbnails in J2 task 8.
+#[allow(dead_code)]
+mod shots;
 mod sound;
 mod store;
 mod tray;
@@ -37,6 +40,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(store::CaptureStore::default())
+        .manage(shots::ShotStore::default())
         .manage(flow::FlowState::default())
         .manage(windowing::OverlaySet::default())
         .invoke_handler(builder.invoke_handler())
