@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Annotation } from '@/editor/document';
-import { OPTIONS, optionsFor, toolOptions } from './options';
+import { newDoc, type Annotation } from '@/editor/document';
+import { strokeWidth } from '@/editor/style';
+import { applyStyle, OPTIONS, optionsFor, styleOf, toolOptions } from './options';
 
 const stroke = { color: '#f00', width: 4, opacity: 1, dash: 'solid' as const };
 const arrow: Annotation = {
@@ -69,5 +70,71 @@ describe('options', () => {
     expect(toolOptions('rect')).toEqual(OPTIONS.rect);
     expect(toolOptions('select')).toEqual([]);
     expect(toolOptions('crop')).toEqual([]);
+  });
+});
+
+describe('applyStyle', () => {
+  const pen: Annotation = { id: 'p', tool: 'pen', points: [], stroke };
+  const doc = { ...newDoc('c', 900, 600), annotations: [arrow, pen, highlighter] };
+
+  it('a dash changes only what has a dash option', () => {
+    const next = applyStyle(doc, ['a', 'p'], { dash: 'dotted' });
+    expect(next.annotations[0]).toMatchObject({ stroke: { dash: 'dotted' } });
+    expect(next.annotations[1]).toEqual(pen);
+  });
+
+  it('opacity changes strokes and highlighters alike', () => {
+    const next = applyStyle(doc, ['a', 'h'], { opacity: 0.4 });
+    expect(next.annotations[0]).toMatchObject({ stroke: { opacity: 0.4 } });
+    expect(next.annotations[2]).toMatchObject({ opacity: 0.4 });
+  });
+
+  it('only the listed annotations change', () => {
+    const next = applyStyle(doc, ['h'], { color: '#00f' });
+    expect(next.annotations[0]).toEqual(arrow);
+    expect(next.annotations[2]).toMatchObject({ color: '#00f' });
+  });
+
+  it('strength sets the pixelation block', () => {
+    const d = { ...doc, annotations: [pixelate] };
+    expect(applyStyle(d, ['p'], { strength: 28 }).annotations[0]).toMatchObject({ block: 28 });
+  });
+
+  it('fill sets the kind and follows the colour', () => {
+    const rect: Annotation = {
+      id: 'r',
+      tool: 'rect',
+      box: { x: 0, y: 0, width: 10, height: 10 },
+      stroke,
+      fill: { kind: 'none', color: '#f00' },
+      shadow: false,
+    };
+    const d = { ...doc, annotations: [rect] };
+    expect(applyStyle(d, ['r'], { fill: 'solid' }).annotations[0]).toMatchObject({
+      fill: { kind: 'solid', color: '#f00' },
+    });
+    expect(applyStyle(d, ['r'], { color: '#0f0' }).annotations[0]).toMatchObject({
+      stroke: { color: '#0f0' },
+      fill: { color: '#0f0' },
+    });
+  });
+});
+
+describe('styleOf', () => {
+  it('reads an annotation back as top-bar values, size as a step', () => {
+    const image = { w: 900, h: 600 };
+    const a: Annotation = { ...arrow, stroke: { ...stroke, width: strokeWidth(image, 3) } };
+    expect(styleOf(a, image)).toEqual({
+      color: '#f00',
+      size: 3,
+      dash: 'solid',
+      shadow: false,
+      opacity: 1,
+    });
+    expect(styleOf(pixelate, image)).toEqual({ strength: 16 });
+    expect(styleOf({ ...text, size: strokeWidth(image, 2) * 6 }, image)).toMatchObject({
+      size: 2,
+      textStyle: 'plain',
+    });
   });
 });

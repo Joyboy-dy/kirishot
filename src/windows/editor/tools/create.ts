@@ -2,7 +2,7 @@
 import { newId, type Annotation, type Point, type Rect } from '@/editor/document';
 import { snapAngle } from '@/editor/geometry';
 import { strokeWidth } from '@/editor/style';
-import type { Style } from '../TopBar';
+import type { Style } from '../StylePopover';
 import type { ToolId } from './catalog';
 
 export type Mods = { shift: boolean; alt: boolean };
@@ -39,18 +39,15 @@ export function strokeOf(style: Style, image: Image) {
   return {
     color: style.color,
     width: strokeWidth(image, style.size),
-    opacity: 1,
-    dash: 'solid' as const,
+    opacity: style.opacity,
+    dash: style.dash,
   };
 }
 
 export function begin(tool: ToolId, at: Point, style: Style, image: Image): Annotation | null {
   const id = newId();
   const stroke = strokeOf(style, image);
-  const fill = {
-    kind: style.fill ? ('translucent' as const) : ('none' as const),
-    color: style.color,
-  };
+  const fill = { kind: style.fill, color: style.color };
   const zero = { ...at, width: 0, height: 0 };
   switch (tool) {
     case 'arrow':
@@ -63,9 +60,16 @@ export function begin(tool: ToolId, at: Point, style: Style, image: Image): Anno
     case 'pen':
       return { id, tool, points: [at], stroke };
     case 'highlighter':
-      return { id, tool, points: [at], color: style.color, width: stroke.width * 4, opacity: 1 };
+      return {
+        id,
+        tool,
+        points: [at],
+        color: style.color,
+        width: stroke.width * 4,
+        opacity: style.opacity,
+      };
     case 'pixelate':
-      return { id, tool, box: zero, block: 16 };
+      return { id, tool, box: zero, block: style.strength };
     default:
       return null;
   }

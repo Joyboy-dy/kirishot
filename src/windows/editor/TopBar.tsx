@@ -1,20 +1,21 @@
 import type { ReactNode } from 'react';
 import { Copy, Download, Redo2, Undo2 } from 'lucide-react';
 import { Tip } from '@/components/ui/Tip';
-import { PALETTE, type SizeStep } from '@/editor/style';
 import { t } from '@/i18n';
+import { StyleControls } from './StylePopover';
 import { TOOLS, type ToolId } from './tools/catalog';
-
-export type Style = { color: string; size: SizeStep; fill: boolean; shadow: boolean };
+import type { Option, StylePatch } from './tools/options';
 
 type Props = {
   tool: ToolId;
-  style: Style;
+  /** The options of the tool, or of the selection with the select tool (spec J2.1 § 3.1). */
+  options: Option[];
+  value: StylePatch;
   canUndo: boolean;
   canRedo: boolean;
   busy: boolean;
   onTool(tool: ToolId): void;
-  onStyle(patch: Partial<Style>): void;
+  onStyle(patch: StylePatch): void;
   onUndo(): void;
   onRedo(): void;
   onCopy(): void;
@@ -73,64 +74,8 @@ export function TopBar(p: Props) {
         </BarButton>
       ))}
       <Divider />
-      <div className="flex flex-1 items-center justify-center gap-1">
-        {PALETTE.map((color) => (
-          <Tip key={color} label={t('editor.color', { color })}>
-            <button
-              type="button"
-              aria-pressed={p.style.color === color}
-              onClick={() => p.onStyle({ color })}
-              className="k-press h-6 w-6 rounded-full border-0 p-0"
-              style={{
-                background: color,
-                boxShadow:
-                  p.style.color === color
-                    ? '0 0 0 2px var(--k-surface), 0 0 0 4px var(--k-accent)'
-                    : 'inset 0 0 0 1px rgba(255, 255, 255, 0.25)',
-              }}
-            />
-          </Tip>
-        ))}
-        <Divider />
-        {([1, 2, 3, 4] as SizeStep[]).map((size) => (
-          <BarButton
-            key={size}
-            label={t(`editor.size.${size}` as 'editor.size.1')}
-            keys={[String(size)]}
-            active={p.style.size === size}
-            onClick={() => p.onStyle({ size })}
-          >
-            <span
-              className="rounded-full"
-              style={{ width: 4 + size * 3, height: 4 + size * 3, background: 'currentColor' }}
-            />
-          </BarButton>
-        ))}
-        <Divider />
-        <BarButton
-          label={t('editor.fill')}
-          active={p.style.fill}
-          onClick={() => p.onStyle({ fill: !p.style.fill })}
-        >
-          <span
-            className="h-4 w-4 rounded-[4px]"
-            style={{
-              border: '2px solid currentColor',
-              background: p.style.fill ? 'currentColor' : 'transparent',
-              opacity: p.style.fill ? 0.6 : 1,
-            }}
-          />
-        </BarButton>
-        <BarButton
-          label={t('editor.shadow')}
-          active={p.style.shadow}
-          onClick={() => p.onStyle({ shadow: !p.style.shadow })}
-        >
-          <span
-            className="h-4 w-4 rounded-[4px]"
-            style={{ background: 'currentColor', boxShadow: '2px 3px 0 rgba(0,0,0,0.55)' }}
-          />
-        </BarButton>
+      <div className="flex min-w-0 flex-1 items-center justify-center gap-1">
+        <StyleControls options={p.options} value={p.value} onChange={p.onStyle} />
       </div>
       <Divider />
       <BarButton

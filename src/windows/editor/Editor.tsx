@@ -25,17 +25,28 @@ import { ContextBubble } from './ContextBubble';
 import { exportImage, type ExportIntent } from './export';
 import { keyAction, type EditorAction } from './keys';
 import { StatusBar } from './StatusBar';
-import { TopBar, type Style } from './TopBar';
+import type { Style } from './StylePopover';
+import { TopBar } from './TopBar';
 import { AnnotationNode } from './tools/AnnotationNode';
 import type { ToolId } from './tools/catalog';
 import { begin, DRAG_TOOLS, extend, finish } from './tools/create';
+import { applyStyle, optionsFor, styleOf, toolOptions, type StylePatch } from './tools/options';
 import { CropShade, SelectionUi } from './tools/SelectionUi';
 import { textPointer } from './tools/text';
 import { TextEditor } from './tools/TextEditor';
 import { useEditorSession } from './useEditorSession';
 import { fit, zoomAt, type View } from './viewport';
 
-const DEFAULT_STYLE: Style = { color: PALETTE[0], size: 2, fill: false, shadow: true };
+const DEFAULT_STYLE: Style = {
+  color: PALETTE[0],
+  size: 2,
+  fill: 'none',
+  shadow: true,
+  dash: 'solid',
+  opacity: 1,
+  textStyle: 'plain',
+  strength: 16,
+};
 type TextAnnotation = Extract<Annotation, { tool: 'text' }>;
 
 function cropBox(a: Point, b: Point): Rect {
@@ -45,55 +56,6 @@ function cropBox(a: Point, b: Point): Rect {
     width: Math.abs(b.x - a.x),
     height: Math.abs(b.y - a.y),
   };
-}
-
-/** The style choice applied to an existing annotation (spec J2 § 4.1). */
-function restyle(
-  a: Annotation,
-  style: Partial<Style>,
-  image: { w: number; h: number },
-): Annotation {
-  const width = style.size ? strokeWidth(image, style.size) : undefined;
-  switch (a.tool) {
-    case 'arrow':
-    case 'line':
-    case 'pen':
-      return {
-        ...a,
-        stroke: {
-          ...a.stroke,
-          color: style.color ?? a.stroke.color,
-          width: width ?? a.stroke.width,
-        },
-        ...(a.tool === 'arrow' && style.shadow !== undefined ? { shadow: style.shadow } : {}),
-      };
-    case 'rect':
-    case 'ellipse':
-      return {
-        ...a,
-        stroke: {
-          ...a.stroke,
-          color: style.color ?? a.stroke.color,
-          width: width ?? a.stroke.width,
-        },
-        fill:
-          style.fill === undefined && !style.color
-            ? a.fill
-            : {
-                kind: (style.fill ?? a.fill.kind !== 'none') ? 'translucent' : 'none',
-                color: style.color ?? a.fill.color,
-              },
-        shadow: style.shadow ?? a.shadow,
-      };
-    case 'highlighter':
-      return { ...a, color: style.color ?? a.color, width: width ? width * 4 : a.width };
-    case 'text':
-      return { ...a, color: style.color ?? a.color, size: width ? width * 6 : a.size };
-    case 'step':
-      return { ...a, color: style.color ?? a.color, size: width ?? a.size };
-    case 'pixelate':
-      return a;
-  }
 }
 
 /** The annotation editor (spec J2 § 4). */
@@ -184,21 +146,10 @@ export function Editor() {
     else setCropDraft(null);
   };
 
-  const applyStyle = (patch: Partial<Style>) => {
+  // A setting becomes the drawing style and, with a selection, applies to it in one undo step.
+  const changeStyle = (patch: StylePatch) => {
     setStyle((s) => ({ ...s, ...patch }));
-    if (!doc || selected.length === 0) return;
-    let next = doc;
-    for (const a of doc.annotations.filter((x) => selected.includes(x.id)))
-      next = update(next, a.id, restyle(a, patch, doc.size));
-    record(next);
-  };
-
-  const changeSelected = (patch: (a: Annotation) => Partial<Annotation>) => {
-    if (!doc) return;
-    let next = doc;
-    for (const a of doc.annotations.filter((x) => selected.includes(x.id)))
-      next = update(next, a.id, patch(a));
-    record(next);
+    if (doc && selected.length > 0) record(applyStyle(doc, selected, patch));
   };
 
   const act = (action: EditorAction) => {
@@ -207,7 +158,7 @@ export function Editor() {
       case 'tool':
         return changeTool(action.tool);
       case 'size':
-        return applyStyle({ size: action.step });
+        return changeStyle({ size: action.step });
       case 'undo':
         return setHistory((h) => h && undo(h));
       case 'redo':
@@ -343,7 +294,7 @@ export function Editor() {
           text: '',
           size: strokeWidth(doc.size, style.size) * 6,
           color: style.color,
-          style: 'plain',
+          style: style.textStyle,
         });
       return;
     }
@@ -379,20 +330,25 @@ export function Editor() {
 
   const selectedAnnotations = doc ? doc.annotations.filter((a) => selected.includes(a.id)) : [];
   // The bubble sits under the selection, in the canvas area's CSS pixels.
-  let bubbleAt: { x: number; y: number } | null = null;
+  let bubbleSel: Rect | null = null;
   if (tool === 'select' && selectedAnnotations.length > 0 && stage) {
     const rects = selected
       .map((id) => stage?.findOne(`#${id}`)?.getClientRect())
       .filter((r): r is NonNullable<typeof r> => Boolean(r));
     if (rects.length > 0) {
       const left = Math.min(...rects.map((r) => r.x));
+      const top = Math.min(...rects.map((r) => r.y));
       const right = Math.max(...rects.map((r) => r.x + r.width));
       const bottom = Math.max(...rects.map((r) => r.y + r.height));
-      const top = Math.min(...rects.map((r) => r.y));
-      const below = bottom + 12 + 40 < box.height;
-      bubbleAt = { x: (left + right) / 2, y: below ? bottom + 12 : Math.max(8, top - 52) };
+      bubbleSel = { x: left, y: top, width: right - left, height: bottom - top };
     }
   }
+  // What the controls show: the first selected annotation's settings, or the drawing style.
+  const shownStyle: StylePatch =
+    tool === 'select' && selectedAnnotations[0] && doc
+      ? styleOf(selectedAnnotations[0], doc.size)
+      : style;
+  const shownOptions = tool === 'select' ? optionsFor(selectedAnnotations) : toolOptions(tool);
 
   const cursor = tool === 'select' ? 'default' : tool === 'text' ? 'text' : 'crosshair';
 
@@ -403,12 +359,13 @@ export function Editor() {
     >
       <TopBar
         tool={tool}
-        style={style}
+        options={shownOptions}
+        value={shownStyle}
         canUndo={(history?.past.length ?? 0) > 0}
         canRedo={(history?.future.length ?? 0) > 0}
         busy={!doc || busy}
         onTool={changeTool}
-        onStyle={applyStyle}
+        onStyle={changeStyle}
         onUndo={() => setHistory((h) => h && undo(h))}
         onRedo={() => setHistory((h) => h && redo(h))}
         onCopy={() => runExport('copy')}
@@ -500,17 +457,13 @@ export function Editor() {
         {editing && (
           <TextEditor a={editing} view={view} onDone={(text) => finishText(editing, text)} />
         )}
-        {bubbleAt && (
+        {bubbleSel && (
           <ContextBubble
             selected={selectedAnnotations}
-            at={bubbleAt}
-            onDash={(dash) =>
-              changeSelected((a) => ('stroke' in a ? { stroke: { ...a.stroke, dash } } : {}))
-            }
-            onOpacity={(opacity) =>
-              changeSelected((a) => ('stroke' in a ? { stroke: { ...a.stroke, opacity } } : {}))
-            }
-            onTextStyle={(s) => changeSelected((a) => (a.tool === 'text' ? { style: s } : {}))}
+            sel={bubbleSel}
+            area={box}
+            value={shownStyle}
+            onStyle={changeStyle}
             onFront={() => doc && record(selected.reduce((d, id) => reorder(d, id, 'front'), doc))}
             onBack={() =>
               doc && record([...selected].reverse().reduce((d, id) => reorder(d, id, 'back'), doc))

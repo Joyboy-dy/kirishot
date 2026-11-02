@@ -1,34 +1,33 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowDownToLine, ArrowUpToLine, Trash2 } from 'lucide-react';
 import { Tip } from '@/components/ui/Tip';
-import type { Annotation, Stroke, TextStyle } from '@/editor/document';
+import type { Annotation, Rect } from '@/editor/document';
 import { t } from '@/i18n';
+import { bubblePlacement } from './bubble';
+import { StyleControls } from './StylePopover';
+import { optionsFor, type StylePatch } from './tools/options';
 
 type Props = {
   selected: Annotation[];
-  /** Where to show the bubble, in CSS pixels of the canvas area. */
-  at: { x: number; y: number };
-  onDash(dash: Stroke['dash']): void;
-  onOpacity(opacity: number): void;
-  onTextStyle(style: TextStyle): void;
+  /** The selection's bounds, in CSS pixels of the canvas area. */
+  sel: Rect;
+  area: { width: number; height: number };
+  value: StylePatch;
+  onStyle(patch: StylePatch): void;
   onFront(): void;
   onBack(): void;
   onDelete(): void;
 };
 
-function Chip(p: { label: string; active?: boolean; onClick(): void; children: ReactNode }) {
+function Action(p: { label: string; onClick(): void; children: ReactNode }) {
   return (
     <Tip label={p.label} side="top">
       <button
         type="button"
-        aria-pressed={p.active}
+        aria-label={p.label}
         onClick={p.onClick}
-        className="k-press flex h-7 min-w-7 items-center justify-center rounded-md border-0 px-1.5 text-[12px] hover:bg-white/10"
-        style={
-          p.active
-            ? { background: 'var(--k-accent-soft)', color: 'var(--k-accent-text)' }
-            : { background: 'transparent', color: 'var(--k-text)' }
-        }
+        className="k-press flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent px-1.5 hover:bg-white/10"
+        style={{ color: 'var(--k-text)' }}
       >
         {p.children}
       </button>
@@ -36,26 +35,37 @@ function Chip(p: { label: string; active?: boolean; onClick(): void; children: R
   );
 }
 
-const DASHES: { dash: Stroke['dash']; label: string; sample: string }[] = [
-  { dash: 'solid', label: 'editor.dash.solid', sample: '───' },
-  { dash: 'dashed', label: 'editor.dash.dashed', sample: '- - -' },
-  { dash: 'dotted', label: 'editor.dash.dotted', sample: '···' },
-];
-const TEXT_STYLES: TextStyle[] = ['plain', 'pill', 'outline'];
-
-/** Settings of the selected annotation, next to it (spec J2 § 4.1). */
+/**
+ * Settings of the selection, next to it (spec J2.1 § 3.2): only the options every selected
+ * annotation has, and always fully inside the canvas area.
+ */
 export function ContextBubble(p: Props) {
-  const one = p.selected.length === 1 ? p.selected[0] : null;
-  const stroke = one && 'stroke' in one ? one.stroke : null;
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setSize({ width: el.offsetWidth, height: el.offsetHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const options = optionsFor(p.selected);
+  const at = size ? bubblePlacement(p.sel, size, p.area) : null;
   return (
     <div
+      ref={ref}
       role="toolbar"
       aria-label={t('editor.selection')}
-      className="absolute z-10 flex items-center gap-0.5 rounded-xl p-1"
+      // Wider than the area: the controls go to a second line instead of being cut.
+      className="absolute z-10 flex flex-wrap items-center gap-0.5 rounded-xl p-1"
       style={{
-        left: p.at.x,
-        top: p.at.y,
-        transform: 'translateX(-50%)',
+        left: at?.x ?? 0,
+        top: at?.y ?? 0,
+        maxWidth: Math.max(0, p.area.width - 16),
+        visibility: at ? 'visible' : 'hidden',
         background: 'var(--k-glass)',
         backdropFilter: 'blur(16px)',
         border: '1px solid var(--k-border)',
@@ -63,54 +73,21 @@ export function ContextBubble(p: Props) {
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      {stroke &&
-        DASHES.map((d) => (
-          <Chip
-            key={d.dash}
-            label={t(d.label as 'editor.dash.solid')}
-            active={stroke.dash === d.dash}
-            onClick={() => p.onDash(d.dash)}
-          >
-            <span className="font-mono">{d.sample}</span>
-          </Chip>
-        ))}
-      {stroke && (
-        <label
-          className="mx-1 flex items-center gap-1.5 text-[12px]"
-          style={{ color: 'var(--k-text-2)' }}
-        >
-          {t('editor.opacity')}
-          <input
-            type="range"
-            min={20}
-            max={100}
-            value={Math.round(stroke.opacity * 100)}
-            onChange={(e) => p.onOpacity(Number(e.target.value) / 100)}
-            className="w-20 accent-[var(--k-accent)]"
-          />
-        </label>
+      {options.length > 0 && (
+        <>
+          <StyleControls options={options} value={p.value} onChange={p.onStyle} />
+          <span className="mx-1 h-5 w-px shrink-0" style={{ background: 'var(--k-border)' }} />
+        </>
       )}
-      {one?.tool === 'text' &&
-        TEXT_STYLES.map((s) => (
-          <Chip
-            key={s}
-            label={t(`editor.textStyle.${s}` as 'editor.textStyle.plain')}
-            active={one.style === s}
-            onClick={() => p.onTextStyle(s)}
-          >
-            {t(`editor.textStyle.${s}` as 'editor.textStyle.plain')}
-          </Chip>
-        ))}
-      <span className="mx-1 h-5 w-px" style={{ background: 'var(--k-border)' }} />
-      <Chip label={t('editor.front')} onClick={p.onFront}>
+      <Action label={t('editor.front')} onClick={p.onFront}>
         <ArrowUpToLine size={15} />
-      </Chip>
-      <Chip label={t('editor.back')} onClick={p.onBack}>
+      </Action>
+      <Action label={t('editor.back')} onClick={p.onBack}>
         <ArrowDownToLine size={15} />
-      </Chip>
-      <Chip label={t('editor.delete')} onClick={p.onDelete}>
+      </Action>
+      <Action label={t('editor.delete')} onClick={p.onDelete}>
         <Trash2 size={15} />
-      </Chip>
+      </Action>
     </div>
   );
 }
