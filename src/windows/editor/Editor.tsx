@@ -29,6 +29,8 @@ import { keyAction, type EditorAction } from './keys';
 import { saveState, type SaveState } from './save';
 import { afterChoice, closeDecision, hasUnsavedChanges, type CloseChoice } from './closing';
 import { CloseDialog } from './CloseDialog';
+import { rememberColor } from './ColorPicker';
+import { pickScreenColor } from './colors';
 import { baseName, splitName } from './fileName';
 import { NameField } from './NameField';
 import { toolbarLayout } from './layout';
@@ -393,6 +395,13 @@ export function Editor() {
         return requestClose({ kind: 'window' });
       case 'rename':
         return setRenaming(true);
+      case 'eyedropper':
+        // Anywhere on the screen, this image or another application (spec J3 § 3.4).
+        return void pickScreenColor().then((color) => {
+          if (!color) return;
+          changeStyle({ color });
+          void rememberColor(color);
+        });
       case 'front':
         if (selected.length === 0) return;
         return record(selected.reduce((d, id) => reorder(d, id, 'front'), doc));

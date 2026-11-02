@@ -27,6 +27,7 @@
     "perfect-freehand": "~1.2.3",
     "radix-ui": "^1.8.1",
     "react": "^19.1.0",
+    "react-colorful": "^5.8.1",
     "react-dom": "^19.1.0",
     "react-konva": "^19.3.2",
     "tailwind-merge": "^3.7.0",

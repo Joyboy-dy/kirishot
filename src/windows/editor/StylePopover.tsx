@@ -5,6 +5,7 @@ import { Tip } from '@/components/ui/Tip';
 import type { Block, Fill, Stroke, TextStyle } from '@/editor/document';
 import { PALETTE, type SizeStep } from '@/editor/style';
 import { t, type MessageKey } from '@/i18n';
+import { ColorPicker } from './ColorPicker';
 import type { Option, StylePatch } from './tools/options';
 
 /** The settings a drawing starts with; every option of the table has a value. */
@@ -96,6 +97,7 @@ export function Palette(p: { value?: string; onChange(color: string): void; smal
           onClick={() => p.onChange(color)}
         />
       ))}
+      <ColorPicker value={p.value} onChange={p.onChange} />
     </div>
   );
 }

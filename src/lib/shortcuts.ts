@@ -60,6 +60,7 @@ export const EDITOR_SHORTCUTS: ShortcutGroup[] = [
       { keys: ['Ctrl', '['], label: t('editor.back') },
       { keys: ['←', '↑', '→', '↓'], label: t('keys.editor.nudge') },
       { keys: ['1', '2', '3', '4'], label: t('keys.editor.size') },
+      { keys: ['I'], label: t('editor.eyedropper') },
     ],
   },
   {

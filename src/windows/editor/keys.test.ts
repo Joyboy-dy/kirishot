@@ -68,3 +68,11 @@ describe('order shortcuts', () => {
     expect(ctrl('[')).toEqual({ type: 'back' });
   });
 });
+
+describe('eyedropper key', () => {
+  it('I picks a colour', () => {
+    expect(
+      keyAction({ key: 'i', ctrl: false, shift: false, alt: false, editingText: false }),
+    ).toEqual({ type: 'eyedropper' });
+  });
+});
