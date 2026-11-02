@@ -434,6 +434,50 @@ pub async fn open_save_folder(
         .map_err(|e| fail(&e))
 }
 
+/// « Nouvelle capture » in the main window: the window steps aside, then a region capture starts
+/// as with the shortcut (the frozen screen must not show Kirishot itself).
+#[tauri::command]
+#[specta::specta]
+pub async fn start_capture(window: tauri::WebviewWindow) -> KResult<()> {
+    window
+        .hide()
+        .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?;
+    let app = window.app_handle().clone();
+    std::thread::spawn(move || {
+        // Long enough for the window manager to take the window off the screen.
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        crate::flow::start(
+            &app,
+            crate::flow::StartMode::Region,
+            std::time::Instant::now(),
+        );
+    });
+    Ok(())
+}
+
+/// The folder of the log files, in the Explorer (« À propos »).
+#[tauri::command]
+#[specta::specta]
+pub async fn open_logs_folder(app: tauri::AppHandle) -> KResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let dir = paths::logs_dir();
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| KirishotError::new(ErrorCode::Save, e.to_string()))?;
+    app.opener()
+        .open_path(dir.to_string_lossy(), None::<&str>)
+        .map_err(|e| KirishotError::new(ErrorCode::Save, e.to_string()))
+}
+
+/// Kirishot's repository, in the browser (« À propos »).
+#[tauri::command]
+#[specta::specta]
+pub async fn open_repository(app: tauri::AppHandle) -> KResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(crate::messages::REPOSITORY_URL, None::<&str>)
+        .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))
+}
+
 /// Every capture of the history, newest first.
 #[tauri::command]
 #[specta::specta]
@@ -574,6 +618,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             editor_open_next,
             editor_cancel_next,
             editor_rename,
+            start_capture,
+            open_logs_folder,
+            open_repository,
             history_list,
             history_thumb_path,
             history_copy,

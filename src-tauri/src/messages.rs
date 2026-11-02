@@ -24,3 +24,6 @@ pub const TRAY_REGION: &str = "Capturer une zone";
 pub const TRAY_FULLSCREEN: &str = "Capturer l'écran entier";
 pub const TRAY_SETTINGS: &str = "Réglages";
 pub const TRAY_QUIT: &str = "Quitter";
+
+/// Where the source code lives (« À propos »).
+pub const REPOSITORY_URL: &str = "https://github.com/Joyboy-dy/kirishot";

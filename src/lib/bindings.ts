@@ -55,6 +55,15 @@ export const commands = {
 	 *  the page keeps for the first save. Returns the new path, if a file was renamed.
 	 */
 	editorRename: (captureId: string, currentPath: string | null, stem: string) => typedError<string | null, KirishotError>(__TAURI_INVOKE("editor_rename", { captureId, currentPath, stem })),
+	/**
+	 *  « Nouvelle capture » in the main window: the window steps aside, then a region capture starts
+	 *  as with the shortcut (the frozen screen must not show Kirishot itself).
+	 */
+	startCapture: () => typedError<null, KirishotError>(__TAURI_INVOKE("start_capture")),
+	/**  The folder of the log files, in the Explorer (« À propos »). */
+	openLogsFolder: () => typedError<null, KirishotError>(__TAURI_INVOKE("open_logs_folder")),
+	/**  Kirishot's repository, in the browser (« À propos »). */
+	openRepository: () => typedError<null, KirishotError>(__TAURI_INVOKE("open_repository")),
 	/**  Every capture of the history, newest first. */
 	historyList: () => typedError<HistoryEntry[], KirishotError>(__TAURI_INVOKE("history_list")),
 	/**  The thumbnail file of a capture, for `convertFileSrc`. */

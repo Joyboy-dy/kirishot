@@ -17,6 +17,9 @@
     "allow-history-edit",
     "allow-history-reveal",
     "allow-history-delete",
-    "allow-history-clear"
+    "allow-history-clear",
+    "allow-start-capture",
+    "allow-open-logs-folder",
+    "allow-open-repository"
   ]
 }
