@@ -1,10 +1,11 @@
-import { useState, type PointerEvent, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { ContextMenu } from 'radix-ui';
 import { Copy, Download, PencilLine, X } from 'lucide-react';
 import { Tip } from '@/components/ui/Tip';
 import { t } from '@/i18n';
 import { footerText, type CardState } from './cardText';
+import { isDrag } from './drag';
 import { cardSize } from './stack';
 
 type Props = {
@@ -17,7 +18,8 @@ type Props = {
   onDelete(): void;
   onReveal(): void;
   onCopyPath(): void;
-  onDragStart(e: PointerEvent<HTMLButtonElement>): void;
+  /** Drags the card's file into another application. */
+  onDrag(): void;
 };
 
 function IconButton(props: {
@@ -52,6 +54,9 @@ export function Card(props: Props) {
   const { state } = props;
   const { card, clock, status, leaving } = state;
   const [hovered, setHovered] = useState(false);
+  // Where the press started, until it becomes a drag or a click.
+  const press = useRef<{ x: number; y: number } | null>(null);
+  const dragged = useRef(false);
   const size = cardSize(card.width, card.height);
   const src = card.src ? convertFileSrc(card.src) : card.preview;
   const saved = status?.kind === 'saved';
@@ -84,10 +89,25 @@ export function Card(props: Props) {
             <button
               type="button"
               aria-label={t('thumb.edit')}
-              onClick={props.onEdit}
-              onPointerDown={props.onDragStart}
+              onClick={() => {
+                if (!dragged.current) props.onEdit();
+              }}
+              onPointerDown={(e) => {
+                press.current = { x: e.clientX, y: e.clientY };
+                dragged.current = false;
+              }}
+              onPointerMove={(e) => {
+                const from = press.current;
+                if (!from || !card.src || !isDrag(from, { x: e.clientX, y: e.clientY })) return;
+                press.current = null;
+                dragged.current = true;
+                props.onDrag();
+              }}
+              onPointerUp={() => {
+                press.current = null;
+              }}
+              style={{ background: '#16191f', cursor: 'pointer' }}
               className="block h-full w-full border-0 p-0"
-              style={{ background: '#16191f' }}
             >
               {src && (
                 <img

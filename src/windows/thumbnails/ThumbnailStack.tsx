@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { startDrag } from '@crabnebula/tauri-plugin-drag';
 import { commands, events, type ThumbStatus } from '@/lib/ipc';
 import { t } from '@/i18n';
 import { Card } from './Card';
 import type { CardState } from './cardText';
 import { pause, resume, start, tick } from './countdown';
+import { withTimeout } from './drag';
 import { empty, push, remove, type Stack as StackModel } from './stack';
 
 const TICK_MS = 100;
@@ -11,6 +13,8 @@ const EXIT_MS = 150;
 /** How long a card shows the result of an action before leaving. */
 const CONFIRM_MS = 800;
 const RESULT_MS = 1500;
+/** Rust cancels a stuck drag after 30 s too; the card never waits longer. */
+const DRAG_TIMEOUT_MS = 30_000;
 
 function report(result: Promise<{ status: 'ok' | 'error'; error?: unknown }>) {
   return result.then((r) => {
@@ -140,7 +144,13 @@ export function ThumbnailStack() {
             onDelete={() => void report(commands.thumbnailDelete(c.id))}
             onReveal={() => void report(commands.thumbnailReveal(c.id))}
             onCopyPath={() => void report(commands.thumbnailCopyPath(c.id))}
-            onDragStart={() => {}}
+            onDrag={() => {
+              if (!c.src) return;
+              patch(c.id, (s) => ({ ...s, clock: pause(s.clock) }));
+              void withTimeout(startDrag({ item: [c.src], icon: c.src }), DRAG_TIMEOUT_MS)
+                .catch((e: unknown) => console.error(e))
+                .finally(() => patch(c.id, (s) => ({ ...s, clock: resume(s.clock) })));
+            }}
           />
         );
       })}

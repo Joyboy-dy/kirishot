@@ -38,6 +38,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_drag::init())
         .manage(store::CaptureStore::default())
         .manage(shots::ShotStore::default())
         .manage(thumbnails::ThumbState::default())
@@ -57,6 +58,8 @@ pub fn run() {
                     messages::SETTINGS_RESET_BODY,
                 );
             }
+            // A drag that never ends would freeze every window (drag-rs#94): cancel it after 30 s.
+            drag::set_stuck_drag_timeout(Some(std::time::Duration::from_secs(30)));
             // Thumbnail files from a previous run are never shown again.
             thumbnails::temp::clear(&paths::temp_dir());
             let shortcuts = loaded.settings.shortcuts.clone();
