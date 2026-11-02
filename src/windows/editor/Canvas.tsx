@@ -26,6 +26,8 @@ type Props = {
   panning: boolean;
   /** Picks the cursor, with what the pointer is over. */
   tool: ToolId;
+  /** The eyedropper waits for a click. */
+  picking: boolean;
   onView(v: View): void;
   onDown(p: CanvasPointer): void;
   onMove(p: CanvasPointer): void;
@@ -75,6 +77,7 @@ export const Canvas = forwardRef<Konva.Stage, Props>(function Canvas(p, stageRef
           panning: p.panning,
           panDragging: dragPan !== null,
           dragging,
+          picking: p.picking,
           hover,
         }),
       }}

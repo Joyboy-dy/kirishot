@@ -16,21 +16,18 @@ export function pushRecent(list: string[], color: string): string[] {
   return [c, ...list.filter((x) => x.toUpperCase() !== c)].slice(0, RECENT_MAX);
 }
 
-/** The EyeDropper API (WebView2): picks a colour anywhere on the screen. */
-export function hasEyeDropper(w: Window): boolean {
-  return 'EyeDropper' in w;
-}
-
-type EyeDropperApi = { open(): Promise<{ sRGBHex: string }> };
-
-/** A colour picked on the screen, or `null` when cancelled (Échap). */
-export async function pickScreenColor(): Promise<string | null> {
-  const Ctor = (window as unknown as { EyeDropper?: new () => EyeDropperApi }).EyeDropper;
-  if (!Ctor) return null;
-  try {
-    const { sRGBHex } = await new Ctor().open();
-    return normalizeHex(sRGBHex);
-  } catch {
-    return null;
-  }
+/**
+ * The eyedropper: the colour of the capture's pixel at `at` (image pixels), or `null` outside it.
+ * It reads the capture itself: WebView2 exposes the screen EyeDropper API but never opens it.
+ */
+export function pixelColor(
+  pixels: { width: number; height: number; data: ArrayLike<number> },
+  at: { x: number; y: number },
+): string | null {
+  const x = Math.floor(at.x);
+  const y = Math.floor(at.y);
+  if (x < 0 || y < 0 || x >= pixels.width || y >= pixels.height) return null;
+  const i = (y * pixels.width + x) * 4;
+  const hex = [0, 1, 2].map((c) => pixels.data[i + c].toString(16).padStart(2, '0')).join('');
+  return `#${hex}`.toUpperCase();
 }

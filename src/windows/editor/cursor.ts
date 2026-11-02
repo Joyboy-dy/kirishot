@@ -11,6 +11,8 @@ export type CursorState = {
   panDragging: boolean;
   /** An annotation, a handle or an anchor is being dragged. */
   dragging: boolean;
+  /** The eyedropper waits for a click on the image. */
+  picking: boolean;
   hover: Hover;
 };
 
@@ -29,6 +31,7 @@ const RESIZE: Record<string, string> = {
 export function cursorFor(s: CursorState): string {
   if (s.panDragging) return 'grabbing';
   if (s.panning) return 'grab';
+  if (s.picking) return 'crosshair';
   if (s.tool === 'text') return 'text';
   if (s.tool !== 'select') return 'crosshair';
   if (typeof s.hover === 'object') return RESIZE[s.hover.anchor] ?? 'default';

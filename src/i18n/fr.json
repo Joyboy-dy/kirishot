@@ -190,7 +190,7 @@
   "editor.save": "Enregistrer",
   "editor.customColor": "Couleur personnalisée",
   "editor.hex": "Code hexadécimal",
-  "editor.eyedropper": "Pipette : prendre une couleur à l'écran",
+  "editor.eyedropper": "Pipette : prendre une couleur dans l'image",
   "editor.recentColors": "Récentes",
   "editor.useColor": "Utiliser cette couleur",
   "editor.close.title": "Enregistrer les modifications ?",

@@ -15,7 +15,7 @@ annotate, drag it into another app, or let it save itself.
 - A searchable history of every capture, to copy, reopen with its annotations, or find on disk.
 - Smart saving: nothing to save when nothing changed, replace or keep a new version, rename in place,
   and a question before closing unsaved changes.
-- Custom colours and an eyedropper that picks anywhere on the screen.
+- Custom colours and an eyedropper that picks a colour in the capture.
 - Editable global shortcuts, a theme setting, and launch at Windows startup.
 
 ## Requirements

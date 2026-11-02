@@ -155,7 +155,7 @@
 ### Éditeur : couleurs
 
 95. « + » après la palette : choisir une couleur dans le sélecteur ou taper un code (« abc », « #A1B2C3 ») ; elle s'applique et entre dans les récentes (8 au plus, la dernière en tête).
-96. Pipette (bouton ou touche I) : prendre une couleur dans l'image, puis dans une autre application ; Échap annule.
+96. Voir 110 (la pipette prend désormais sa couleur dans l'image).
 
 ### Fenêtre principale
 
@@ -174,3 +174,5 @@
 106. Outil Sélection : flèche sur le vide, main ouverte sur une annotation, main fermée pendant le déplacement ; flèches de redimensionnement sur les poignées d'un cadre ; main sur les extrémités et la courbure d'une flèche. Outils de dessin : croix, même sur une annotation ; Texte : curseur texte ; Espace : main.
 107. Tracer un cadre : l'outil Rectangle reste actif, un second cadre se trace aussitôt. Réglages › Après capture › Éditeur › « Après une annotation » sur « Revenir à la sélection » : après le tracé, l'outil Sélection est actif et le cadre est sélectionné, avec ses poignées.
 108. Ouvrir Style : aucune info-bulle ne s'ouvre seule ; en survolant une option, l'info-bulle vient après un court instant, au-dessus de l'option. Fermer le menu à la souris : pas d'info-bulle sur le bouton Style. Au clavier (Tab), les info-bulles s'affichent toujours.
+109. Ouvrir une capture : l'image est ajustée à la fenêtre dès l'ouverture, sans cliquer sur Ajuster. Agrandir ou redimensionner la fenêtre la garde ajustée ; après un zoom ou un déplacement de la vue, elle ne bouge plus, jusqu'à Ajuster ou Ctrl+0.
+110. Pipette (bouton dans « + », ou touche I) : le sélecteur se ferme, le curseur devient une croix ; un clic sur l'image prend la couleur de ce pixel, l'applique (et à la sélection) et l'ajoute aux récentes. Échap ou un changement d'outil annule ; avec l'outil Texte, le clic ne crée pas de champ. L'info-bulle de la pipette s'affiche à sa gauche.

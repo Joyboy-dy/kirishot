@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasEyeDropper, normalizeHex, pushRecent } from './colors';
+import { normalizeHex, pixelColor, pushRecent } from './colors';
 
 describe('custom colours', () => {
   it('puts the newest colour first, upper case', () => {
@@ -23,9 +23,24 @@ describe('custom colours', () => {
     expect(normalizeHex('#12345')).toBeNull();
     expect(normalizeHex('zzzzzz')).toBeNull();
   });
+});
 
-  it('detects the eyedropper', () => {
-    expect(hasEyeDropper({} as Window)).toBe(false);
-    expect(hasEyeDropper({ EyeDropper: class {} } as unknown as Window)).toBe(true);
+describe('pixelColor', () => {
+  // 2 × 1 pixels: red, then a half-transparent blue.
+  const pixels = {
+    width: 2,
+    height: 1,
+    data: new Uint8ClampedArray([255, 0, 0, 255, 0, 0, 255, 128]),
+  };
+
+  it('reads the pixel under the point, as #RRGGBB', () => {
+    expect(pixelColor(pixels, { x: 0.2, y: 0.9 })).toBe('#FF0000');
+    expect(pixelColor(pixels, { x: 1.7, y: 0 })).toBe('#0000FF');
+  });
+
+  it('outside the image there is no colour', () => {
+    expect(pixelColor(pixels, { x: -0.1, y: 0 })).toBeNull();
+    expect(pixelColor(pixels, { x: 2, y: 0 })).toBeNull();
+    expect(pixelColor(pixels, { x: 0, y: 1 })).toBeNull();
   });
 });

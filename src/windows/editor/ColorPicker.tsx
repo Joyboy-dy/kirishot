@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { Pipette, Plus } from 'lucide-react';
 import { Popover } from 'radix-ui';
 import { HexColorPicker } from 'react-colorful';
@@ -6,7 +6,10 @@ import { Tip } from '@/components/ui/Tip';
 import { t } from '@/i18n';
 import { commands, events } from '@/lib/ipc';
 import { NO_CHANGE } from '@/lib/settings';
-import { hasEyeDropper, normalizeHex, pickScreenColor, pushRecent } from './colors';
+import { normalizeHex, pushRecent } from './colors';
+
+/** Starts the eyedropper: the next click on the image picks its colour (the editor provides it). */
+export const PickColor = createContext<(() => void) | null>(null);
 
 /** Keeps `color` at the front of the recent custom colours (settings `editor.recentColors`). */
 export async function rememberColor(color: string): Promise<void> {
@@ -46,11 +49,14 @@ export function ColorPicker({
     onChange(color);
     void rememberColor(color);
   };
-  const eyedropper = hasEyeDropper(window);
+  const pick = useContext(PickColor);
+  const [open, setOpen] = useState(false);
   return (
     <Popover.Root
-      onOpenChange={(open) => {
-        if (!open) return;
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) return;
         setDraft(value ?? draft);
         setHex(value ?? draft);
       }}
@@ -120,19 +126,17 @@ export function ColorPicker({
                 color: 'var(--k-text)',
               }}
             />
-            {eyedropper && (
-              <Tip label={t('editor.eyedropper')} keys={['I']}>
+            {pick && (
+              // On the left: below, the tip would cover « Utiliser ».
+              <Tip label={t('editor.eyedropper')} keys={['I']} side="left">
                 <button
                   type="button"
                   aria-label={t('editor.eyedropper')}
-                  onClick={() =>
-                    void pickScreenColor().then((c) => {
-                      if (!c) return;
-                      setDraft(c);
-                      setHex(c);
-                      choose(c);
-                    })
-                  }
+                  onClick={() => {
+                    // The picker closes: the whole image is free to click.
+                    setOpen(false);
+                    pick();
+                  }}
                   className="k-press flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent hover:bg-white/10"
                   style={{ color: 'var(--k-text)' }}
                 >

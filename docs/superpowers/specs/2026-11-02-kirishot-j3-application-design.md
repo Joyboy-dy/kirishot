@@ -89,6 +89,8 @@ Kirishot s'ouvre comme une vraie application, retrouve chaque capture dans son h
 - Un bouton « + » après la palette ouvre un sélecteur : zone teinte-saturation, curseur de teinte, champ hexadécimal (`react-colorful`, MIT), et les 8 dernières couleurs libres (`editor.recentColors` dans les réglages).
 - Pipette : bouton dans le sélecteur, ou touche I. API `EyeDropper` de WebView2 : la couleur est prise n'importe où sur l'écran, image et autres applications comprises. Échap annule. La couleur prise devient la couleur courante et entre dans les récentes. Si l'API manque, le bouton n'est pas affiché.
 
+> Modifié par J3.1 : WebView2 expose l'API `EyeDropper` sans jamais l'ouvrir. La pipette prend désormais la couleur dans l'image : le sélecteur se ferme, un clic sur la capture prend le pixel, Échap ou un changement d'outil annule.
+
 ### 3.5 Fermer avec des modifications non enregistrées
 
 - Une capture a des modifications non enregistrées quand son état est `dirty`, ou `never` avec un document différent de celui de l'ouverture (annotation, recadrage).

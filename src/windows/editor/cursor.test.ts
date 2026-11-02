@@ -6,6 +6,7 @@ const base: CursorState = {
   panning: false,
   panDragging: false,
   dragging: false,
+  picking: false,
   hover: 'none',
 };
 
@@ -50,6 +51,11 @@ describe('cursorFor', () => {
       'crop',
     ] as const)
       expect(cursorFor({ ...base, tool, hover: 'annotation' })).toBe('crosshair');
+  });
+
+  it('the eyedropper aims, whatever the tool and the hover', () => {
+    expect(cursorFor({ ...base, picking: true, hover: 'annotation' })).toBe('crosshair');
+    expect(cursorFor({ ...base, tool: 'text', picking: true })).toBe('crosshair');
   });
 
   it('the text tool shows a text cursor', () => {

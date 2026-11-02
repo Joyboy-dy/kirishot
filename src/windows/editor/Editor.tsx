@@ -30,8 +30,8 @@ import { keyAction, type EditorAction } from './keys';
 import { saveState, savedDocOnOpen, type SaveState } from './save';
 import { afterChoice, closeDecision, hasUnsavedChanges, type CloseChoice } from './closing';
 import { CloseDialog } from './CloseDialog';
-import { rememberColor } from './ColorPicker';
-import { pickScreenColor } from './colors';
+import { PickColor, rememberColor } from './ColorPicker';
+import { pixelColor } from './colors';
 import { baseName, splitName } from './fileName';
 import { NameField } from './NameField';
 import { toolbarLayout } from './layout';
@@ -362,7 +362,14 @@ export function Editor() {
     return () => void unlisten.then((stop) => stop());
   }, []);
 
+  // The eyedropper: the next click on the image picks its colour (spec J3 § 3.4, J3.1).
+  const [picking, setPicking] = useState(false);
+  const startPicking = () => setPicking(true);
+  // The release of the picking click: no text field, no shape.
+  const pickedPress = useRef(false);
+
   const changeTool = (next: ToolId) => {
+    setPicking(false);
     setTool(next);
     setDraft(null);
     if (next !== 'select') setSelected([]);
@@ -420,18 +427,14 @@ export function Editor() {
         return record(next);
       }
       case 'escape':
+        if (picking) return setPicking(false);
         if (cropDraft) return changeTool('select');
         if (selected.length > 0) return setSelected([]);
         return requestClose({ kind: 'window' });
       case 'rename':
         return setRenaming(true);
       case 'eyedropper':
-        // Anywhere on the screen, this image or another application (spec J3 § 3.4).
-        return void pickScreenColor().then((color) => {
-          if (!color) return;
-          changeStyle({ color });
-          void rememberColor(color);
-        });
+        return startPicking();
       case 'front':
         if (selected.length === 0) return;
         return record(selected.reduce((d, id) => reorder(d, id, 'front'), doc));
@@ -499,6 +502,15 @@ export function Editor() {
 
   const onDown = (p: CanvasPointer) => {
     if (!doc) return;
+    if (picking && loaded) {
+      setPicking(false);
+      pickedPress.current = true;
+      const color = pixelColor(loaded.pixels, p.at);
+      if (!color) return;
+      changeStyle({ color });
+      void rememberColor(color);
+      return;
+    }
     if (tool === 'select') {
       if (p.target === p.target.getStage()) setSelected([]);
       return;
@@ -537,6 +549,10 @@ export function Editor() {
 
   const textPressEnded = useRef(false);
   const onUp = (p: CanvasPointer) => {
+    if (pickedPress.current) {
+      pickedPress.current = false;
+      return;
+    }
     if (tool === 'text' && doc) {
       const node = p.target.findAncestor('.annotation', true);
       const hit = doc.annotations.find((a) => a.id === node?.id() && a.tool === 'text');
@@ -611,40 +627,42 @@ export function Editor() {
       className="flex h-screen w-screen flex-col overflow-hidden"
       style={{ background: 'var(--k-bg)', color: 'var(--k-text)' }}
     >
-      <TopBar
-        tool={tool}
-        options={shownOptions}
-        value={shownStyle}
-        canUndo={(history?.past.length ?? 0) > 0}
-        canRedo={(history?.future.length ?? 0) > 0}
-        busy={!doc || busy}
-        views={{
-          copy: buttonView(buttons.copy, now),
-          save: buttonView(buttons.save, now),
-          main: buttonView(buttons.main, now),
-        }}
-        onTool={changeTool}
-        onStyle={changeStyle}
-        onStyleSettled={settleStyle}
-        onUndo={() => setHistory((h) => h && undo(h))}
-        onRedo={() => setHistory((h) => h && redo(h))}
-        onCopy={() => runExport('copy')}
-        onSave={() => act({ type: 'save' })}
-        saveState={currentSave}
-        onSaveVersion={() => runExport('saveVersion')}
-        onSaveAs={() => runExport('saveAs')}
-        selectionActions={
-          selected.length > 0
-            ? {
-                onFront: () => act({ type: 'front' }),
-                onBack: () => act({ type: 'back' }),
-                onDuplicate: () => act({ type: 'duplicate' }),
-                onDelete: () => act({ type: 'delete' }),
-              }
-            : null
-        }
-        onCopyAndClose={() => runExport('copyAndClose')}
-      />
+      <PickColor.Provider value={startPicking}>
+        <TopBar
+          tool={tool}
+          options={shownOptions}
+          value={shownStyle}
+          canUndo={(history?.past.length ?? 0) > 0}
+          canRedo={(history?.future.length ?? 0) > 0}
+          busy={!doc || busy}
+          views={{
+            copy: buttonView(buttons.copy, now),
+            save: buttonView(buttons.save, now),
+            main: buttonView(buttons.main, now),
+          }}
+          onTool={changeTool}
+          onStyle={changeStyle}
+          onStyleSettled={settleStyle}
+          onUndo={() => setHistory((h) => h && undo(h))}
+          onRedo={() => setHistory((h) => h && redo(h))}
+          onCopy={() => runExport('copy')}
+          onSave={() => act({ type: 'save' })}
+          saveState={currentSave}
+          onSaveVersion={() => runExport('saveVersion')}
+          onSaveAs={() => runExport('saveAs')}
+          selectionActions={
+            selected.length > 0
+              ? {
+                  onFront: () => act({ type: 'front' }),
+                  onBack: () => act({ type: 'back' }),
+                  onDuplicate: () => act({ type: 'duplicate' }),
+                  onDelete: () => act({ type: 'delete' }),
+                }
+              : null
+          }
+          onCopyAndClose={() => runExport('copyAndClose')}
+        />
+      </PickColor.Provider>
       <div
         ref={boxRef}
         className="relative min-h-0 flex-1 overflow-hidden"
@@ -658,6 +676,7 @@ export function Editor() {
             size={box}
             panning={panning}
             tool={tool}
+            picking={picking}
             onView={moveView}
             onDown={onDown}
             onMove={onMove}
@@ -670,7 +689,8 @@ export function Editor() {
                 doc={doc}
                 pixels={loaded.pixels}
                 events={{
-                  draggable: tool === 'select',
+                  // While picking, a click on an annotation reaches the eyedropper.
+                  draggable: tool === 'select' && !picking,
                   onSelect: (id, more) =>
                     setSelected((s) =>
                       more
@@ -713,7 +733,7 @@ export function Editor() {
             }
             overlay={
               <>
-                {tool === 'select' && (
+                {tool === 'select' && !picking && (
                   <SelectionUi
                     selected={selectedAnnotations}
                     stage={stage}
