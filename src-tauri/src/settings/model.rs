@@ -47,6 +47,24 @@ pub struct CaptureSettings {
     pub include_cursor: bool,
     pub tray_timer_seconds: u8,
     pub commit_on_release: bool,
+    /// The selection mode the next capture starts in (the last one chosen).
+    pub mode: CaptureMode,
+    pub toolbar_position: ToolbarPosition,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum CaptureMode {
+    Region,
+    Window,
+}
+
+/// Where the selection screen shows its toolbar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum ToolbarPosition {
+    Top,
+    Bottom,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -142,6 +160,8 @@ impl Default for Settings {
                 include_cursor: false,
                 tray_timer_seconds: 3,
                 commit_on_release: false,
+                mode: CaptureMode::Region,
+                toolbar_position: ToolbarPosition::Top,
             },
             shortcuts: Shortcuts {
                 region: Some("Super+Shift+S".into()),
@@ -187,6 +207,9 @@ pub struct SettingsPatch {
     pub thumbnail: Option<bool>,
     pub thumbnail_duration: Option<ThumbnailDuration>,
     pub always_open_editor: Option<bool>,
+    pub commit_on_release: Option<bool>,
+    pub mode: Option<CaptureMode>,
+    pub toolbar_position: Option<ToolbarPosition>,
 }
 
 /// How long a thumbnail stays; a patch cannot carry `null` to mean "until closed".
@@ -211,6 +234,9 @@ impl SettingsPatch {
             thumbnail: None,
             thumbnail_duration: None,
             always_open_editor: None,
+            commit_on_release: None,
+            mode: None,
+            toolbar_position: None,
         }
     }
 }
@@ -249,6 +275,15 @@ pub fn apply_patch(s: &mut Settings, p: SettingsPatch) {
     if let Some(on) = p.always_open_editor {
         s.after_capture.always_open_editor = on;
     }
+    if let Some(on) = p.commit_on_release {
+        s.capture.commit_on_release = on;
+    }
+    if let Some(mode) = p.mode {
+        s.capture.mode = mode;
+    }
+    if let Some(position) = p.toolbar_position {
+        s.capture.toolbar_position = position;
+    }
 }
 
 #[cfg(test)]
@@ -270,7 +305,7 @@ mod tests {
         );
         assert_eq!(
             v["capture"],
-            json!({"magnifier": true, "sound": true, "flash": true, "includeCursor": false, "trayTimerSeconds": 3, "commitOnRelease": false})
+            json!({"magnifier": true, "sound": true, "flash": true, "includeCursor": false, "trayTimerSeconds": 3, "commitOnRelease": false, "mode": "region", "toolbarPosition": "top"})
         );
         assert_eq!(
             v["shortcuts"],
@@ -282,6 +317,25 @@ mod tests {
             json!({"launchAtStartup": true, "language": "auto", "theme": "system", "checkUpdates": true})
         );
         assert_eq!(v["onboardingDone"], false);
+    }
+
+    #[test]
+    fn patch_sets_capture_behaviour() {
+        let mut s = Settings::default();
+        apply_patch(
+            &mut s,
+            SettingsPatch {
+                commit_on_release: Some(true),
+                mode: Some(CaptureMode::Window),
+                toolbar_position: Some(ToolbarPosition::Bottom),
+                ..SettingsPatch::empty()
+            },
+        );
+        let mut expected = Settings::default();
+        expected.capture.commit_on_release = true;
+        expected.capture.mode = CaptureMode::Window;
+        expected.capture.toolbar_position = ToolbarPosition::Bottom;
+        assert_eq!(s, expected);
     }
 
     #[test]

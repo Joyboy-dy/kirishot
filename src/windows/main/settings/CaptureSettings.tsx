@@ -1,18 +1,21 @@
 import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { commands, type ThumbnailDuration } from '@/lib/ipc';
+import { commands, type ThumbnailDuration, type ToolbarPosition } from '@/lib/ipc';
 import { NO_CHANGE } from '@/lib/settings';
 import { t, type MessageKey } from '@/i18n';
 import { useSettings } from '../useSettings';
 import { Row, Section } from './Layout';
 
 const DURATIONS = ['3', '6', '10', 'untilClosed'] as const;
+const POSITIONS: ToolbarPosition[] = ['top', 'bottom'];
+const ITEM =
+  'px-3 data-[state=on]:border-[var(--k-accent)] data-[state=on]:bg-[var(--k-accent-soft)] data-[state=on]:text-[var(--k-accent-text)]';
 
 function toDuration(v: (typeof DURATIONS)[number]): ThumbnailDuration {
   return v === 'untilClosed' ? { kind: 'untilClosed' } : { kind: 'seconds', value: Number(v) };
 }
 
-/** Settings › Capture: magnifier, sound, flash, thumbnail (spec J2 § 5). */
+/** Settings › Capture: magnifier, sound, flash, release, toolbar, thumbnail (spec J2 § 5, J2.1 § 2). */
 export function CaptureSettings() {
   const { view, update } = useSettings();
   if (!view) return null;
@@ -55,6 +58,28 @@ export function CaptureSettings() {
         'settings.flash.hint',
       )}
       {toggle(
+        'settings.commitOnRelease',
+        capture.commitOnRelease,
+        (on) => void update({ ...NO_CHANGE, commitOnRelease: on }),
+        'settings.commitOnRelease.hint',
+      )}
+      <Row label={t('settings.toolbarPosition')} hint={t('settings.toolbarPosition.hint')}>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          value={capture.toolbarPosition}
+          onValueChange={(v) => {
+            if (v) void update({ ...NO_CHANGE, toolbarPosition: v as ToolbarPosition });
+          }}
+        >
+          {POSITIONS.map((p) => (
+            <ToggleGroupItem key={p} value={p} className={ITEM}>
+              {t(`settings.toolbarPosition.${p}` as MessageKey)}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </Row>
+      {toggle(
         'settings.thumbnail',
         afterCapture.thumbnail,
         (on) => void update({ ...NO_CHANGE, thumbnail: on }),
@@ -75,11 +100,7 @@ export function CaptureSettings() {
           }}
         >
           {DURATIONS.map((d) => (
-            <ToggleGroupItem
-              key={d}
-              value={d}
-              className="px-3 data-[state=on]:border-[var(--k-accent)] data-[state=on]:bg-[var(--k-accent-soft)] data-[state=on]:text-[var(--k-accent-text)]"
-            >
+            <ToggleGroupItem key={d} value={d} className={ITEM}>
               {t(`settings.duration.${d}` as MessageKey)}
             </ToggleGroupItem>
           ))}

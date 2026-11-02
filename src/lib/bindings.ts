@@ -71,6 +71,8 @@ export type AppInfo = {
 
 export type AutoAction = "saveAndCopy" | "copy" | "save";
 
+export type CaptureMode = "region" | "window";
+
 export type CaptureSettings = {
 	/**  Whether the selection screen starts with its magnifier shown. */
 	magnifier: boolean,
@@ -79,6 +81,9 @@ export type CaptureSettings = {
 	includeCursor: boolean,
 	trayTimerSeconds: number,
 	commitOnRelease: boolean,
+	/**  The selection mode the next capture starts in (the last one chosen). */
+	mode: CaptureMode,
+	toolbarPosition: ToolbarPosition,
 };
 
 /**  What the selection overlay asks Rust to capture. */
@@ -157,6 +162,9 @@ export type OverlaySession = {
 	magnifier: boolean,
 	/**  Whether the zone flashes when it is captured. */
 	flash: boolean,
+	/**  The mode the selection starts in. */
+	mode: CaptureMode,
+	toolbarPosition: ToolbarPosition,
 };
 
 export type Point = {
@@ -206,6 +214,9 @@ export type SettingsPatch = {
 	thumbnail: boolean | null,
 	thumbnailDuration: ThumbnailDuration | null,
 	alwaysOpenEditor: boolean | null,
+	commitOnRelease: boolean | null,
+	mode: CaptureMode | null,
+	toolbarPosition: ToolbarPosition | null,
 };
 
 /**  What the settings page displays: the settings plus the resolved destination folder. */
@@ -258,6 +269,9 @@ export type ThumbnailUpdate = {
 	id: string,
 	status: ThumbStatus,
 };
+
+/**  Where the selection screen shows its toolbar. */
+export type ToolbarPosition = "top" | "bottom";
 
 /**  A visible top-level window. Lists of windows are ordered topmost first. */
 export type WindowInfo = {

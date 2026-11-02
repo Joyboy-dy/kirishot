@@ -14,7 +14,7 @@ use crate::error::{ErrorCode, KResult, KirishotError};
 use crate::geometry::{Point, monitor_at_point, resolve_target, windows_for_monitor};
 use crate::output::{CaptureMeta, deliver};
 use crate::settings::SettingsState;
-use crate::settings::model::AutoAction;
+use crate::settings::model::{AutoAction, CaptureMode, ToolbarPosition};
 use crate::store::CaptureStore;
 use crate::{frame, notify, windowing};
 
@@ -33,6 +33,9 @@ pub struct OverlaySession {
     pub magnifier: bool,
     /// Whether the zone flashes when it is captured.
     pub flash: bool,
+    /// The mode the selection starts in.
+    pub mode: CaptureMode,
+    pub toolbar_position: ToolbarPosition,
 }
 
 /// Tells the other overlays to drop their selection: a selection stays on one monitor.
@@ -249,6 +252,8 @@ fn start_region(app: &tauri::AppHandle) -> KResult<()> {
                 commit_on_release: settings.capture.commit_on_release,
                 magnifier: settings.capture.magnifier,
                 flash: settings.capture.flash,
+                mode: settings.capture.mode,
+                toolbar_position: settings.capture.toolbar_position,
             };
             let json = serde_json::to_string(&overlay).expect("session always serializes");
             (i, frame::encode_frame(&shot.image), json)

@@ -11,4 +11,7 @@ export const NO_CHANGE: SettingsPatch = {
   thumbnail: null,
   thumbnailDuration: null,
   alwaysOpenEditor: null,
+  commitOnRelease: null,
+  mode: null,
+  toolbarPosition: null,
 };

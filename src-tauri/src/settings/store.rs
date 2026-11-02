@@ -207,7 +207,7 @@ pub fn validate(mut s: Settings) -> (Settings, Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::settings::model::{AutoAction, ImageFormat, Settings};
+    use crate::settings::model::{AutoAction, CaptureMode, ImageFormat, Settings, ToolbarPosition};
     use serde_json::json;
 
     #[test]
@@ -289,6 +289,23 @@ mod tests {
         assert_eq!(s.after_capture.thumbnail_seconds, Some(6));
         assert!(!s.capture.sound);
         assert!(s.capture.magnifier && s.capture.flash && s.after_capture.thumbnail);
+    }
+
+    #[test]
+    fn j2_file_gets_capture_defaults() {
+        let file = json!({
+            "version": 1,
+            "capture": {"magnifier": false, "sound": false, "flash": true, "includeCursor": false,
+                        "trayTimerSeconds": 3, "commitOnRelease": true}
+        });
+        let (s, _) = repair(file);
+        let (s, _) = validate(s);
+        assert_eq!(s.capture.mode, CaptureMode::Region);
+        assert_eq!(s.capture.toolbar_position, ToolbarPosition::Top);
+        assert!(!s.capture.magnifier && !s.capture.sound && s.capture.commit_on_release);
+
+        let (s, _) = repair(json!({"version": 1, "capture": {"mode": "zone"}}));
+        assert_eq!(s.capture.mode, CaptureMode::Region);
     }
 
     #[test]
