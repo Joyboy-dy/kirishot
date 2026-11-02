@@ -26,6 +26,8 @@ import { exportImage, type ExportIntent } from './export';
 import { buttonView, closeAfterCopy, FEEDBACK, messageVisible, type ButtonState } from './feedback';
 import { keyAction, type EditorAction } from './keys';
 import { saveState, type SaveState } from './save';
+import { baseName, splitName } from './fileName';
+import { NameField } from './NameField';
 import { toolbarLayout } from './layout';
 import { StatusBar } from './StatusBar';
 import type { Style } from './StylePopover';
@@ -107,6 +109,9 @@ export function Editor() {
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const [savedDoc, setSavedDoc] = useState<Doc | null>(null);
   const [pendingName, setPendingName] = useState<string | null>(null);
+  // The name a first save would use, from the template; and the rename field being open.
+  const [plannedName, setPlannedName] = useState('');
+  const [renaming, setRenaming] = useState(false);
   // For callbacks that end after another capture may have arrived.
   const shownRef = useRef(shownId);
   useLayoutEffect(() => {
@@ -121,6 +126,8 @@ export function Editor() {
     setSavedPath(knownPath);
     setSavedDoc(knownPath ? opened : null);
     setPendingName(null);
+    setRenaming(false);
+    setPlannedName('');
     setMessage(null);
     setButtons(ALL_IDLE);
     setSelected([]);
@@ -129,6 +136,18 @@ export function Editor() {
     setEditing(null);
     setView(fit({ w: width, h: height }, box));
   }
+
+  // The name a first save would use, asked once per capture.
+  useEffect(() => {
+    if (!shownId) return;
+    let current = true;
+    void commands.editorPlannedName(shownId).then((r) => {
+      if (current && r.status === 'ok') setPlannedName(r.data);
+    });
+    return () => {
+      current = false;
+    };
+  }, [shownId]);
 
   useEffect(() => {
     const el = boxRef.current;
@@ -145,6 +164,20 @@ export function Editor() {
   const image = doc ? doc.size : { w: 1, h: 1 };
   const record = (next: Doc) => setHistory((h) => h && commit(h, next));
   const currentSave: SaveState = doc ? saveState(doc, savedDoc, savedPath) : 'never';
+  // The saved file's name, or the one the first save will use (spec J3 § 3.3).
+  const shownName = savedPath
+    ? baseName(savedPath)
+    : pendingName
+      ? pendingName + splitName(plannedName).ext
+      : plannedName;
+  const rename = async (stem: string): Promise<string | null> => {
+    if (!doc) return null;
+    const r = await commands.editorRename(doc.captureId, savedPath, stem);
+    if (r.status === 'error') return r.error.message;
+    if (r.data) setSavedPath(r.data);
+    else setPendingName(stem);
+    return null;
+  };
   const fitView = () => {
     if (doc) setView(fit({ w: doc.size.w, h: doc.size.h }, box));
   };
@@ -288,6 +321,8 @@ export function Editor() {
         if (cropDraft) return changeTool('select');
         if (selected.length > 0) return setSelected([]);
         return void commands.editorClose();
+      case 'rename':
+        return setRenaming(true);
       case 'front':
         if (selected.length === 0) return;
         return record(selected.reduce((d, id) => reorder(d, id, 'front'), doc));
@@ -577,6 +612,15 @@ export function Editor() {
         )}
       </div>
       <StatusBar
+        name={
+          <NameField
+            name={shownName}
+            pending={savedPath === null}
+            editing={renaming}
+            onEditing={setRenaming}
+            onRename={rename}
+          />
+        }
         width={doc?.crop?.width ?? doc?.size.w ?? 0}
         height={doc?.crop?.height ?? doc?.size.h ?? 0}
         annotations={doc?.annotations.length ?? 0}

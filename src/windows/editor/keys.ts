@@ -19,7 +19,8 @@ export type EditorAction =
         | 'delete'
         | 'escape'
         | 'front'
-        | 'back';
+        | 'back'
+        | 'rename';
     };
 
 type KeyInput = {
@@ -63,6 +64,7 @@ export function keyAction(e: KeyInput): EditorAction | null {
   }
   if (key === 'Delete' || key === 'Backspace') return { type: 'delete' };
   if (key === 'Escape') return { type: 'escape' };
+  if (key === 'F2') return { type: 'rename' };
   if (['1', '2', '3', '4'].includes(key)) return { type: 'size', step: Number(key) as SizeStep };
   const tool = TOOLS.find((t) => t.key.toLowerCase() === key);
   return tool ? { type: 'tool', tool: tool.id } : null;

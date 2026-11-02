@@ -11,6 +11,8 @@
     "allow-editor-export",
     "allow-open-save-folder",
     "allow-editor-autosave",
-    "allow-settings-get"
+    "allow-settings-get",
+    "allow-editor-planned-name",
+    "allow-editor-rename"
   ]
 }

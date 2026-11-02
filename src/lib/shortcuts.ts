@@ -78,6 +78,7 @@ export const EDITOR_SHORTCUTS: ShortcutGroup[] = [
       { keys: ['Ctrl', 'S'], label: t('editor.save') },
       { keys: ['Ctrl', 'Maj', 'S'], label: t('keys.editor.saveAs') },
       { keys: ['Ctrl', 'Entrée'], label: t('editor.copyAndClose') },
+      { keys: ['F2'], label: t('editor.rename') },
       { keys: ['Échap'], label: t('keys.editor.escape') },
     ],
   },

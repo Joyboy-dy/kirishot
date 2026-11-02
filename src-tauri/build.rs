@@ -33,6 +33,8 @@ fn main() {
                 "editor_export",
                 "editor_autosave",
                 "play_shutter_preview",
+                "editor_planned_name",
+                "editor_rename",
                 "history_list",
                 "history_thumb_path",
                 "history_copy",

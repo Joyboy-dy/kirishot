@@ -101,9 +101,101 @@ pub fn unique_path(dir: &Path, stem: &str, ext: &str, exists: impl Fn(&Path) -> 
         .expect("an unused name always exists")
 }
 
+/// Why a name typed in the editor is refused (spec J3 § 3.3).
+#[derive(Debug, PartialEq, Eq)]
+pub enum StemError {
+    Empty,
+    ForbiddenChar(char),
+    Reserved,
+}
+
+pub fn validate_stem(stem: &str) -> Result<(), StemError> {
+    if stem.trim().is_empty() {
+        return Err(StemError::Empty);
+    }
+    if let Some(c) = stem.chars().find(|c| {
+        matches!(c, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control()
+    }) {
+        return Err(StemError::ForbiddenChar(c));
+    }
+    if RESERVED.iter().any(|r| r.eq_ignore_ascii_case(stem.trim())) {
+        return Err(StemError::Reserved);
+    }
+    Ok(())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum RenameError {
+    Invalid(StemError),
+    Taken,
+}
+
+/// The new path of `current` renamed to `new_stem` (same folder and extension); `None` when the
+/// name does not change.
+pub fn rename_plan(
+    current: &Path,
+    new_stem: &str,
+    exists: impl Fn(&Path) -> bool,
+) -> Result<Option<PathBuf>, RenameError> {
+    validate_stem(new_stem).map_err(RenameError::Invalid)?;
+    let old_stem = current
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if old_stem == new_stem {
+        return Ok(None);
+    }
+    let ext = current
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default();
+    let next = current.with_file_name(format!("{new_stem}{ext}"));
+    // A change of case only: Windows sees the same file, which is not a conflict.
+    let same_file = old_stem.to_lowercase() == new_stem.to_lowercase();
+    if !same_file && exists(&next) {
+        return Err(RenameError::Taken);
+    }
+    Ok(Some(next))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn validate_stem_refuses_what_windows_refuses() {
+        assert_eq!(validate_stem(""), Err(StemError::Empty));
+        assert_eq!(validate_stem("   "), Err(StemError::Empty));
+        assert_eq!(validate_stem("a:b"), Err(StemError::ForbiddenChar(':')));
+        assert_eq!(validate_stem("a?"), Err(StemError::ForbiddenChar('?')));
+        assert_eq!(validate_stem("CON"), Err(StemError::Reserved));
+        assert_eq!(validate_stem("nul"), Err(StemError::Reserved));
+        assert_eq!(validate_stem("com1"), Err(StemError::Reserved));
+        assert_eq!(validate_stem("Rapport final"), Ok(()));
+    }
+
+    #[test]
+    fn rename_plan_handles_same_name_case_and_conflicts() {
+        let current = Path::new(r"C:\x\Rapport.png");
+        let everything_exists = |_: &Path| true;
+        assert_eq!(rename_plan(current, "Rapport", everything_exists), Ok(None));
+        assert_eq!(
+            rename_plan(current, "rapport", everything_exists),
+            Ok(Some(PathBuf::from(r"C:\x\rapport.png")))
+        );
+        assert_eq!(
+            rename_plan(current, "Autre", everything_exists),
+            Err(RenameError::Taken)
+        );
+        assert_eq!(
+            rename_plan(current, "Autre", |_: &Path| false),
+            Ok(Some(PathBuf::from(r"C:\x\Autre.png")))
+        );
+        assert_eq!(
+            rename_plan(current, "a/b", |_: &Path| false),
+            Err(RenameError::Invalid(StemError::ForbiddenChar('/')))
+        );
+    }
     use chrono::NaiveDate;
     use std::path::Path;
 

@@ -213,6 +213,78 @@ pub async fn editor_export(
     .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))?
 }
 
+/// The file name a first save would use: the template's, with the settings' extension.
+#[tauri::command]
+#[specta::specta]
+pub async fn editor_planned_name(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, SettingsState>,
+    capture_id: String,
+) -> KResult<String> {
+    let settings = state.get();
+    let meta = app
+        .state::<crate::shots::ShotStore>()
+        .get(&capture_id)
+        .map(|s| s.meta)
+        .ok_or_else(|| KirishotError::new(ErrorCode::NoActiveCapture, "Capture introuvable"))?;
+    let stem = crate::output::filename::render_name(
+        &settings.save.name_template,
+        &crate::output::filename::NameContext {
+            taken_at: meta.taken_at.naive_local(),
+            window_title: meta.window_title.clone(),
+            counter: settings.save.counter,
+        },
+    );
+    Ok(format!("{stem}.{}", settings.save.format.extension()))
+}
+
+/// Renames the capture's file (spec J3 § 3.3). Without a file yet, only checks the name, which
+/// the page keeps for the first save. Returns the new path, if a file was renamed.
+#[tauri::command]
+#[specta::specta]
+pub async fn editor_rename(
+    app: tauri::AppHandle,
+    capture_id: String,
+    current_path: Option<String>,
+    stem: String,
+) -> KResult<Option<String>> {
+    use crate::output::filename::{RenameError, StemError, rename_plan, validate_stem};
+    let refused = |e: StemError| {
+        let message = match e {
+            StemError::Empty => "Le nom ne peut pas être vide".to_string(),
+            StemError::ForbiddenChar(c) => format!("Le caractère « {c} » n'est pas permis"),
+            StemError::Reserved => "Ce nom est réservé par Windows".to_string(),
+        };
+        KirishotError::new(ErrorCode::Save, message)
+    };
+    let Some(current) = current_path.map(std::path::PathBuf::from) else {
+        validate_stem(&stem).map_err(refused)?;
+        return Ok(None);
+    };
+    let next = match rename_plan(&current, &stem, |p| p.exists()) {
+        Ok(Some(next)) => next,
+        Ok(None) => return Ok(Some(current.to_string_lossy().into_owned())),
+        Err(RenameError::Invalid(e)) => return Err(refused(e)),
+        Err(RenameError::Taken) => {
+            return Err(KirishotError::new(
+                ErrorCode::Save,
+                "Un fichier porte déjà ce nom",
+            ));
+        }
+    };
+    std::fs::rename(&current, &next).map_err(|e| {
+        // ERROR_SHARING_VIOLATION: another application has the file open.
+        let message = if e.raw_os_error() == Some(32) {
+            "Le fichier est utilisé par une autre application".to_string()
+        } else {
+            format!("Renommage impossible : {e}")
+        };
+        KirishotError::new(ErrorCode::Save, message)
+    })?;
+    crate::history::mark_saved(&app, &capture_id, &next);
+    Ok(Some(next.to_string_lossy().into_owned()))
+}
+
 /// Headers carry ASCII only: the page sends paths and names percent-encoded.
 fn percent_decode(s: &str) -> Option<String> {
     let bytes = s.as_bytes();
@@ -476,6 +548,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             editor_close,
             editor_autosave,
             play_shutter_preview,
+            editor_planned_name,
+            editor_rename,
             history_list,
             history_thumb_path,
             history_copy,

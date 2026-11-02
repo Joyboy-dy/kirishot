@@ -44,6 +44,13 @@ export const commands = {
 	editorAutosave: (captureId: string, document: string) => typedError<null, KirishotError>(__TAURI_INVOKE("editor_autosave", { captureId, document })),
 	/**  Plays the shutter click, so the settings page can preview it. */
 	playShutterPreview: () => typedError<null, KirishotError>(__TAURI_INVOKE("play_shutter_preview")),
+	/**  The file name a first save would use: the template's, with the settings' extension. */
+	editorPlannedName: (captureId: string) => typedError<string, KirishotError>(__TAURI_INVOKE("editor_planned_name", { captureId })),
+	/**
+	 *  Renames the capture's file (spec J3 § 3.3). Without a file yet, only checks the name, which
+	 *  the page keeps for the first save. Returns the new path, if a file was renamed.
+	 */
+	editorRename: (captureId: string, currentPath: string | null, stem: string) => typedError<string | null, KirishotError>(__TAURI_INVOKE("editor_rename", { captureId, currentPath, stem })),
 	/**  Every capture of the history, newest first. */
 	historyList: () => typedError<HistoryEntry[], KirishotError>(__TAURI_INVOKE("history_list")),
 	/**  The thumbnail file of a capture, for `convertFileSrc`. */

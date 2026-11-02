@@ -1,8 +1,11 @@
+import type { ReactNode } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { Tip } from '@/components/ui/Tip';
 import { t } from '@/i18n';
 
 type Props = {
+  /** The file name, renamable (spec J3 § 3.3). */
+  name: ReactNode;
   width: number;
   height: number;
   annotations: number;
@@ -15,13 +18,14 @@ type Props = {
   onFit(): void;
 };
 
-/** Dimensions, annotation count, zoom; and the result of the last export. */
+/** File name, dimensions, annotation count, zoom; and the result of the last export. */
 export function StatusBar(p: Props) {
   return (
     <footer
       className="flex h-9 shrink-0 items-center gap-4 whitespace-nowrap px-4 text-[12.5px]"
       style={{ borderTop: '1px solid var(--k-border)', color: 'var(--k-text-2)' }}
     >
+      {p.name}
       <span className="font-mono">
         {p.width} × {p.height}
       </span>
