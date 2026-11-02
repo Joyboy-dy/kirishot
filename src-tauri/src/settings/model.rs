@@ -197,6 +197,7 @@ pub enum ThumbnailDuration {
     UntilClosed,
 }
 
+#[cfg(test)]
 impl SettingsPatch {
     /// A patch that changes nothing.
     pub fn empty() -> Self {
