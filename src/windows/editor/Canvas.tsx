@@ -2,6 +2,8 @@ import { forwardRef, useEffect, useRef, useState, type ReactNode } from 'react';
 import type Konva from 'konva';
 import { Image as KImage, Layer, Stage } from 'react-konva';
 import type { Point } from '@/editor/document';
+import { cursorFor, hoverOf, type Hover } from './cursor';
+import type { ToolId } from './tools/catalog';
 import { pan, zoomAt, type View } from './viewport';
 
 export type CanvasPointer = {
@@ -22,7 +24,8 @@ type Props = {
   size: { width: number; height: number };
   /** Space held: dragging pans instead of drawing. */
   panning: boolean;
-  cursor: string;
+  /** Picks the cursor, with what the pointer is over. */
+  tool: ToolId;
   onView(v: View): void;
   onDown(p: CanvasPointer): void;
   onMove(p: CanvasPointer): void;
@@ -39,6 +42,8 @@ type Props = {
 /** The image and its annotations, zoomed and panned (spec J2 § 4.1). */
 export const Canvas = forwardRef<Konva.Stage, Props>(function Canvas(p, stageRef) {
   const [dragPan, setDragPan] = useState<{ x: number; y: number } | null>(null);
+  const [hover, setHover] = useState<Hover>('none');
+  const [dragging, setDragging] = useState(false);
   const viewRef = useRef(p.view);
   useEffect(() => {
     viewRef.current = p.view;
@@ -64,7 +69,19 @@ export const Canvas = forwardRef<Konva.Stage, Props>(function Canvas(p, stageRef
       ref={stageRef}
       width={p.size.width}
       height={p.size.height}
-      style={{ cursor: dragPan ? 'grabbing' : p.panning ? 'grab' : p.cursor }}
+      style={{
+        cursor: cursorFor({
+          tool: p.tool,
+          panning: p.panning,
+          panDragging: dragPan !== null,
+          dragging,
+          hover,
+        }),
+      }}
+      // Konva drag events bubble here from annotations, handles and anchors.
+      onDragStart={() => setDragging(true)}
+      onDragEnd={() => setDragging(false)}
+      onMouseLeave={() => setHover('none')}
       onWheel={(e) => {
         if (!e.evt.ctrlKey) return;
         e.evt.preventDefault();
@@ -86,6 +103,11 @@ export const Canvas = forwardRef<Konva.Stage, Props>(function Canvas(p, stageRef
           p.onView(pan(viewRef.current, e.evt.clientX - dragPan.x, e.evt.clientY - dragPan.y));
           setDragPan({ x: e.evt.clientX, y: e.evt.clientY });
           return;
+        }
+        // While dragging, the cursor stays what it was at the press.
+        if (!dragging) {
+          const next = hoverOf(e.target === e.target.getStage() ? null : e.target);
+          setHover((h) => (JSON.stringify(h) === JSON.stringify(next) ? h : next));
         }
         const ptr = pointer(e);
         if (ptr) p.onMove(ptr);

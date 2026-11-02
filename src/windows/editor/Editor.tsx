@@ -570,8 +570,6 @@ export function Editor() {
       : style;
   const shownOptions = tool === 'select' ? optionsFor(selectedAnnotations) : toolOptions(tool);
 
-  const cursor = tool === 'select' ? 'default' : tool === 'text' ? 'text' : 'crosshair';
-
   return (
     <div
       // The page never scrolls: only the image area pans and zooms (spec J2.1 § 4.1).
@@ -624,7 +622,7 @@ export function Editor() {
             view={view}
             size={box}
             panning={panning}
-            cursor={cursor}
+            tool={tool}
             onView={setView}
             onDown={onDown}
             onMove={onMove}

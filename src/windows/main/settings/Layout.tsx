@@ -27,10 +27,8 @@ export function Row(props: {
   children: ReactNode;
 }) {
   return (
-    <div
-      className="flex min-h-[64px] items-center justify-between gap-6 px-5 py-4"
-      style={{ borderTop: '1px solid var(--k-border)', marginTop: -1 }}
-    >
+    // Lines only between rows: the first row would draw a straight line over the card's rounded top.
+    <div className="flex min-h-[64px] items-center justify-between gap-6 border-t border-[var(--k-border)] px-5 py-4 first:border-t-0">
       <div className="flex min-w-0 flex-col gap-1">
         <span className="text-[14px] font-medium">{props.label}</span>
         {props.hint && (

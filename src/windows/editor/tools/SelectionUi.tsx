@@ -29,18 +29,11 @@ function Handle(p: {
       fill={p.filled ? '#FF5B38' : 'white'}
       stroke="#FF5B38"
       strokeWidth={2 / p.scale}
+      name="handle"
       draggable
       onMouseDown={(e) => (e.cancelBubble = true)}
       onDragMove={(e) => p.onMove({ x: e.target.x(), y: e.target.y() }, false)}
       onDragEnd={(e) => p.onMove({ x: e.target.x(), y: e.target.y() }, true)}
-      onMouseEnter={(e) => {
-        const c = e.target.getStage()?.container();
-        if (c) c.style.cursor = 'grab';
-      }}
-      onMouseLeave={(e) => {
-        const c = e.target.getStage()?.container();
-        if (c) c.style.cursor = '';
-      }}
     />
   );
 }

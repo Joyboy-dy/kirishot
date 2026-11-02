@@ -129,7 +129,7 @@ export function HistoryPage() {
             </section>
           ))}
           <footer
-            className="flex items-center justify-between gap-4 pt-4 text-[12.5px]"
+            className="mt-4 flex items-center justify-between gap-4 pt-5 text-[12.5px]"
             style={{ borderTop: '1px solid var(--k-border)', color: 'var(--k-text-3)' }}
           >
             <span>
