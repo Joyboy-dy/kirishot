@@ -29,10 +29,10 @@ choose **More info**, then **Run anyway**. Kirishot is uninstalled from **Settin
 
 ## Shortcuts
 
-| Action | Default |
-| --- | --- |
+| Action                       | Default                                |
+| ---------------------------- | -------------------------------------- |
 | Capture a region or a window | **Win + Shift + S** or **PrintScreen** |
-| Capture the whole screen | **Shift + PrintScreen** |
+| Capture the whole screen     | **Shift + PrintScreen**                |
 
 Both can be changed on the **Shortcuts** page, which also lists the keys of the frozen screen and the
 editor. On the frozen screen, the **?** button shows them too.
