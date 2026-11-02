@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-thumbnail-reveal"
+description = "Enables the thumbnail_reveal command without any pre-configured scope."
+commands.allow = ["thumbnail_reveal"]
+
+[[permission]]
+identifier = "deny-thumbnail-reveal"
+description = "Denies the thumbnail_reveal command without any pre-configured scope."
+commands.deny = ["thumbnail_reveal"]

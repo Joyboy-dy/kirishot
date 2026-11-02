@@ -22,6 +22,20 @@ export const commands = {
 	overlayCancel: () => typedError<null, KirishotError>(__TAURI_INVOKE("overlay_cancel")),
 	/**  Copies text, such as the colour under the magnifier. */
 	copyText: (text: string) => typedError<null, KirishotError>(__TAURI_INVOKE("copy_text", { text })),
+	/**  The thumbnails page listens for cards: captures can go to it. */
+	thumbnailsReady: () => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnails_ready")),
+	/**  The visible cards changed: Rust resizes and places the window, or hides it. */
+	thumbnailsLayout: (ids: string[], more: number) => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnails_layout", { ids, more })),
+	thumbnailExpire: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnail_expire", { id })),
+	thumbnailCopy: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnail_copy", { id })),
+	thumbnailSave: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnail_save", { id })),
+	/**  Opens the capture in the editor; its automatic action no longer runs. */
+	thumbnailEdit: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnail_edit", { id })),
+	thumbnailClose: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnail_close", { id })),
+	thumbnailDelete: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnail_delete", { id })),
+	/**  « Ouvrir le dossier »: the Explorer with the saved file selected. */
+	thumbnailReveal: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnail_reveal", { id })),
+	thumbnailCopyPath: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnail_copy_path", { id })),
 };
 
 /** Events */
@@ -29,6 +43,8 @@ export const events = {
 	overlayClaimed: makeEvent<OverlayClaimed, OverlayClaimed>("overlay-claimed"),
 	overlayReset: makeEvent<OverlayReset, OverlayReset>("overlay-reset"),
 	settingsChanged: makeEvent<SettingsChanged, SettingsChanged>("settings-changed"),
+	thumbnailPushed: makeEvent<ThumbnailPushed, ThumbnailPushed>("thumbnail-pushed"),
+	thumbnailUpdate: makeEvent<ThumbnailUpdate, ThumbnailUpdate>("thumbnail-update"),
 };
 
 /* Types */
@@ -191,8 +207,30 @@ export type SystemSettings = {
 
 export type Theme = "system" | "dark" | "light";
 
+export type ThumbStatus = { kind: "saved"; path: string } | { kind: "copied" } | { kind: "failed"; message: string } | { kind: "removed" };
+
 /**  How long a thumbnail stays; a patch cannot carry `null` to mean "until closed". */
 export type ThumbnailDuration = { kind: "seconds"; value: number } | { kind: "untilClosed" };
+
+/**  A new card for the stack. */
+export type ThumbnailPushed = {
+	id: string,
+	/**  The temporary PNG, for `convertFileSrc` and dragging. */
+	src: string | null,
+	/**  A small JPEG data URL, only when the temporary file could not be written. */
+	preview: string | null,
+	width: number,
+	height: number,
+	/**  `None`: the card stays until it is closed. */
+	seconds: number | null,
+	action: AutoAction,
+	copied: boolean,
+};
+
+export type ThumbnailUpdate = {
+	id: string,
+	status: ThumbStatus,
+};
 
 /**  A visible top-level window. Lists of windows are ordered topmost first. */
 export type WindowInfo = {

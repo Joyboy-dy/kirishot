@@ -10,6 +10,8 @@ use crate::geometry::{Point, Rect};
 use crate::paths;
 use crate::settings::model::{SettingsPatch, apply_patch};
 use crate::settings::{self, SettingsChanged, SettingsState, SettingsView};
+use crate::shots::ShotStore;
+use crate::thumbnails::{self, ThumbState, ThumbnailPushed, ThumbnailUpdate};
 use crate::windowing;
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -59,6 +61,97 @@ pub async fn settings_update(
         log::warn!("cannot emit settings-changed: {e}");
     }
     Ok(view)
+}
+
+/// The thumbnails page listens for cards: captures can go to it.
+#[tauri::command]
+#[specta::specta]
+pub async fn thumbnails_ready(state: tauri::State<'_, ThumbState>) -> KResult<()> {
+    state.mark_ready();
+    Ok(())
+}
+
+/// The visible cards changed: Rust resizes and places the window, or hides it.
+#[tauri::command]
+#[specta::specta]
+pub async fn thumbnails_layout(app: tauri::AppHandle, ids: Vec<String>, more: u32) -> KResult<()> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(thumbnails::layout(&handle, &ids, more));
+    })
+    .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?;
+    rx.recv()
+        .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn thumbnail_expire(app: tauri::AppHandle, id: String) -> KResult<()> {
+    tauri::async_runtime::spawn_blocking(move || thumbnails::expire(&app, &id))
+        .await
+        .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn thumbnail_copy(app: tauri::AppHandle, id: String) -> KResult<()> {
+    thumbnails::copy(&app, &id)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn thumbnail_save(app: tauri::AppHandle, id: String) -> KResult<()> {
+    tauri::async_runtime::spawn_blocking(move || thumbnails::save(&app, &id))
+        .await
+        .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))?
+}
+
+/// Opens the capture in the editor; its automatic action no longer runs.
+#[tauri::command]
+#[specta::specta]
+pub async fn thumbnail_edit(app: tauri::AppHandle, id: String) -> KResult<()> {
+    if !app.state::<ShotStore>().begin_edit(&id) {
+        return Err(KirishotError::new(
+            ErrorCode::NoActiveCapture,
+            "Capture introuvable",
+        ));
+    }
+    log::info!("editor requested for {id} (J2 task 12)");
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn thumbnail_close(app: tauri::AppHandle, id: String) -> KResult<()> {
+    tauri::async_runtime::spawn_blocking(move || thumbnails::close(&app, &id))
+        .await
+        .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn thumbnail_delete(app: tauri::AppHandle, id: String) -> KResult<()> {
+    thumbnails::delete(&app, &id);
+    Ok(())
+}
+
+/// « Ouvrir le dossier »: the Explorer with the saved file selected.
+#[tauri::command]
+#[specta::specta]
+pub async fn thumbnail_reveal(app: tauri::AppHandle, id: String) -> KResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let path = thumbnails::saved_path(&app, &id)?;
+    app.opener()
+        .reveal_item_in_dir(path)
+        .map_err(|e| KirishotError::new(ErrorCode::Save, e.to_string()))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn thumbnail_copy_path(app: tauri::AppHandle, id: String) -> KResult<()> {
+    let path = thumbnails::saved_path(&app, &id)?;
+    crate::output::clipboard::write_text(&path.to_string_lossy())
 }
 
 /// Copies text, such as the colour under the magnifier.
@@ -158,12 +251,24 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             overlay_claim,
             overlay_commit,
             overlay_cancel,
-            copy_text
+            copy_text,
+            thumbnails_ready,
+            thumbnails_layout,
+            thumbnail_expire,
+            thumbnail_copy,
+            thumbnail_save,
+            thumbnail_edit,
+            thumbnail_close,
+            thumbnail_delete,
+            thumbnail_reveal,
+            thumbnail_copy_path
         ])
         .events(collect_events![
             SettingsChanged,
             OverlayClaimed,
-            OverlayReset
+            OverlayReset,
+            ThumbnailPushed,
+            ThumbnailUpdate
         ])
         // Used by the overlay before any command carries them.
         .typ::<Rect>()

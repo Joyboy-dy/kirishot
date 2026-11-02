@@ -11,7 +11,7 @@ pub fn show(app: &tauri::AppHandle, title: &str, body: &str) {
     }
 }
 
-/// Confirms a capture (J1 only: the floating thumbnail replaces this in J2).
+/// Confirms a capture taken without a thumbnail (setting off, or its window unavailable).
 pub fn delivered(app: &tauri::AppHandle, d: &Delivery) {
     let file_name = d
         .saved

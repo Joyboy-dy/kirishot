@@ -21,7 +21,6 @@ struct Shot {
     meta: CaptureMeta,
     action: AutoAction,
     state: ShotState,
-    copied: bool,
     temp_png: Option<PathBuf>,
 }
 
@@ -30,10 +29,7 @@ struct Shot {
 pub struct ShotView {
     pub image: Arc<RgbaImage>,
     pub meta: CaptureMeta,
-    pub action: AutoAction,
     pub state: ShotState,
-    pub copied: bool,
-    pub temp_png: Option<PathBuf>,
 }
 
 #[derive(Default)]
@@ -49,7 +45,6 @@ impl ShotStore {
             meta,
             action,
             state: ShotState::Pending,
-            copied: false,
             temp_png: None,
         };
         self.shots.lock().unwrap().insert(id.clone(), shot);
@@ -62,10 +57,7 @@ impl ShotStore {
         Some(ShotView {
             image: s.image.clone(),
             meta: s.meta.clone(),
-            action: s.action,
             state: s.state,
-            copied: s.copied,
-            temp_png: s.temp_png.clone(),
         })
     }
 
@@ -89,12 +81,6 @@ impl ShotStore {
                 true
             }
             None => false,
-        }
-    }
-
-    pub fn mark_copied(&self, id: &str) {
-        if let Some(shot) = self.shots.lock().unwrap().get_mut(id) {
-            shot.copied = true;
         }
     }
 
@@ -144,7 +130,6 @@ mod tests {
         let shot = store.get(&id).unwrap();
         assert_eq!(shot.state, ShotState::Pending);
         assert_eq!(shot.image.dimensions(), (4, 3));
-        assert!(!shot.copied);
     }
 
     #[test]
@@ -184,8 +169,6 @@ mod tests {
     fn release_returns_the_temp_file() {
         let (store, id) = store_with_one();
         store.set_temp_png(&id, PathBuf::from("a.png"));
-        store.mark_copied(&id);
-        assert!(store.get(&id).unwrap().copied);
         assert_eq!(store.release(&id), Some(PathBuf::from("a.png")));
         assert!(store.get(&id).is_none());
         assert!(!store.begin_edit(&id));

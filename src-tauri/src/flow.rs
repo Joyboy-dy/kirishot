@@ -113,6 +113,69 @@ impl FlowState {
     }
 }
 
+/// What happens to a capture once it is taken.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Route {
+    /// J1 behavior: the automatic action at once, confirmed by a notification.
+    Immediate,
+    Thumbnail,
+    Editor,
+}
+
+pub fn route(s: &crate::settings::model::Settings, thumbnails_alive: bool) -> Route {
+    if s.after_capture.always_open_editor {
+        Route::Editor
+    } else if s.after_capture.thumbnail && thumbnails_alive {
+        Route::Thumbnail
+    } else {
+        Route::Immediate
+    }
+}
+
+/// What follows a capture: the thumbnail, the editor, or the J1 immediate action. A copy-only
+/// capture (Ctrl+C in the selection) is copied at once, with no file and no thumbnail.
+fn after_capture(
+    app: &tauri::AppHandle,
+    img: image::RgbaImage,
+    meta: CaptureMeta,
+    monitor: &MonitorInfo,
+    copy_only: bool,
+) {
+    if copy_only {
+        if let Err(e) = deliver(app, &img, &meta, AutoAction::Copy) {
+            notify::failure(app, &e);
+        }
+        return;
+    }
+    let settings = app.state::<SettingsState>().get();
+    let alive = app.state::<crate::thumbnails::ThumbState>().alive(app);
+    let pushed = match route(&settings, alive) {
+        Route::Immediate => None,
+        // The editor arrives in J2 task 12; until then the thumbnail stands in for it.
+        Route::Thumbnail | Route::Editor if alive => Some(crate::thumbnails::push(
+            app,
+            img.clone(),
+            meta.clone(),
+            monitor,
+        )),
+        Route::Thumbnail | Route::Editor => None,
+    };
+    match pushed {
+        Some(Ok(())) => {}
+        Some(Err(e)) => {
+            log::error!("thumbnail failed, falling back: {e}");
+            report(
+                app,
+                deliver(app, &img, &meta, settings.after_capture.auto_action),
+            );
+        }
+        None => report(
+            app,
+            deliver(app, &img, &meta, settings.after_capture.auto_action),
+        ),
+    }
+}
+
 pub enum StartMode {
     Region,
     Fullscreen,
@@ -224,9 +287,9 @@ fn run_fullscreen(app: &tauri::AppHandle) -> KResult<()> {
         taken_at: session.taken_at,
         window_title: title,
     };
+    let monitor = shot.info.clone();
     app.state::<FlowState>().finish();
-    let action = app.state::<SettingsState>().get().after_capture.auto_action;
-    report(app, deliver(app, &img, &meta, action));
+    after_capture(app, img, meta, &monitor, false);
     Ok(())
 }
 
@@ -296,15 +359,13 @@ pub fn commit(
         taken_at: session.taken_at,
         window_title: title,
     };
+    let monitor = shot.info.clone();
     drop(session);
     end_selection(app);
-    let action = if copy_only {
-        AutoAction::Copy
-    } else {
-        app.state::<SettingsState>().get().after_capture.auto_action
-    };
     let app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || report(&app, deliver(&app, &img, &meta, action)));
+    tauri::async_runtime::spawn_blocking(move || {
+        after_capture(&app, img, meta, &monitor, copy_only)
+    });
     Ok(())
 }
 
@@ -370,6 +431,18 @@ mod tests {
         f.attach("b".into());
         assert!(!f.expire_unrevealed("a"));
         assert_eq!(f.active_capture().as_deref(), Some("b"));
+    }
+
+    #[test]
+    fn route_prefers_editor_then_thumbnail() {
+        let mut s = crate::settings::model::Settings::default();
+        assert_eq!(route(&s, true), Route::Thumbnail);
+        assert_eq!(route(&s, false), Route::Immediate);
+        s.after_capture.thumbnail = false;
+        assert_eq!(route(&s, true), Route::Immediate);
+        s.after_capture.always_open_editor = true;
+        assert_eq!(route(&s, true), Route::Editor);
+        assert_eq!(route(&s, false), Route::Editor);
     }
 
     #[test]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-thumbnails-ready"
+description = "Enables the thumbnails_ready command without any pre-configured scope."
+commands.allow = ["thumbnails_ready"]
+
+[[permission]]
+identifier = "deny-thumbnails-ready"
+description = "Denies the thumbnails_ready command without any pre-configured scope."
+commands.deny = ["thumbnails_ready"]

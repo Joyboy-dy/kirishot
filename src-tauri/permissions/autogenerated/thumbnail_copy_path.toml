@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-thumbnail-copy-path"
+description = "Enables the thumbnail_copy_path command without any pre-configured scope."
+commands.allow = ["thumbnail_copy_path"]
+
+[[permission]]
+identifier = "deny-thumbnail-copy-path"
+description = "Denies the thumbnail_copy_path command without any pre-configured scope."
+commands.deny = ["thumbnail_copy_path"]

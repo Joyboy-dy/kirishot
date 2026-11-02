@@ -18,6 +18,16 @@ fn main() {
                 "overlay_commit",
                 "overlay_cancel",
                 "copy_text",
+                "thumbnails_ready",
+                "thumbnails_layout",
+                "thumbnail_expire",
+                "thumbnail_copy",
+                "thumbnail_save",
+                "thumbnail_edit",
+                "thumbnail_close",
+                "thumbnail_delete",
+                "thumbnail_reveal",
+                "thumbnail_copy_path",
             ])),
     )
     .expect("failed to run tauri-build");

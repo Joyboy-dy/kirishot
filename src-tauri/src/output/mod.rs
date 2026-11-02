@@ -66,6 +66,30 @@ pub fn deliver(
     }
 }
 
+/// The capture as PNG bytes.
+pub fn encode_png(img: &RgbaImage) -> KResult<Vec<u8>> {
+    encode::encode(img, ImageFormat::Png)
+}
+
+/// Copies the capture; `png` may already hold its PNG bytes.
+pub fn copy_image(
+    app: &tauri::AppHandle,
+    img: &RgbaImage,
+    png: &mut Option<Vec<u8>>,
+) -> KResult<()> {
+    copy_capture(app, img, png)
+}
+
+/// Saves the capture with the name and format of the settings.
+pub fn save_image(
+    app: &tauri::AppHandle,
+    img: &RgbaImage,
+    meta: &CaptureMeta,
+) -> KResult<SavedFile> {
+    let settings = app.state::<SettingsState>().get();
+    save_capture(app, &settings, img, meta, &mut None)
+}
+
 /// PNG bytes, encoded once and shared by saving and copying.
 fn png_bytes<'a>(img: &RgbaImage, cache: &'a mut Option<Vec<u8>>) -> KResult<&'a [u8]> {
     if cache.is_none() {

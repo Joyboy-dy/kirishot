@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-thumbnail-delete"
+description = "Enables the thumbnail_delete command without any pre-configured scope."
+commands.allow = ["thumbnail_delete"]
+
+[[permission]]
+identifier = "deny-thumbnail-delete"
+description = "Denies the thumbnail_delete command without any pre-configured scope."
+commands.deny = ["thumbnail_delete"]

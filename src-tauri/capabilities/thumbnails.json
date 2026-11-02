@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "thumbnails",
+  "description": "The floating thumbnails after a capture",
+  "windows": ["thumbnails"],
+  "permissions": [
+    "core:event:default",
+    "allow-thumbnails-ready",
+    "allow-thumbnails-layout",
+    "allow-thumbnail-expire",
+    "allow-thumbnail-copy",
+    "allow-thumbnail-save",
+    "allow-thumbnail-edit",
+    "allow-thumbnail-close",
+    "allow-thumbnail-delete",
+    "allow-thumbnail-reveal",
+    "allow-thumbnail-copy-path"
+  ]
+}
