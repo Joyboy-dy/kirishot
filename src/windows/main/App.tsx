@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { t } from '@/i18n';
 import { AboutPage } from './about/AboutPage';
+import { HistoryPage } from './history/HistoryPage';
 import { Page } from './Page';
 import { DEFAULT_ROUTE, type Route } from './routes';
 import { CaptureSettings } from './settings/CaptureSettings';
@@ -17,7 +18,7 @@ export function App() {
     >
       <Sidebar route={route} onRoute={setRoute} />
       {route === 'about' && <AboutPage />}
-      {route === 'history' && <Page title={t('main.history')}>{null}</Page>}
+      {route === 'history' && <HistoryPage />}
       {route === 'shortcuts' && <Page title={t('main.shortcuts')}>{null}</Page>}
       {route === 'settings' && (
         <Page title={t('main.settings')}>
