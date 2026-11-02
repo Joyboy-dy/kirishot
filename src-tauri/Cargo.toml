@@ -1,7 +1,7 @@
 [package]
 name = "kirishot"
 version = "0.1.0"
-description = "Screenshot tool for Windows"
+description = "A clean, fast screenshot tool for Windows"
 authors = ["Kirishot contributors"]
 license = "MIT"
 edition = "2024"
