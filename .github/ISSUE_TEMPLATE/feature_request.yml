@@ -1,0 +1,16 @@
+name: Feature request
+description: An idea to make Kirishot better.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What are you trying to do?
+      description: The need or the situation, before the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: The solution you have in mind, and how other tools handle it if you know.

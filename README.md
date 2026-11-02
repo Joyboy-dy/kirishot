@@ -71,9 +71,8 @@ pnpm tauri build --bundles nsis
 
 ## Contributing
 
-Bug reports and ideas are welcome in [Issues](https://github.com/Joyboy-dy/kirishot/issues). For a
-pull request, keep `pnpm lint`, `pnpm test` and `cargo test` green. Design notes and the manual test
-checklist are in [`docs/`](docs). Security issues: see [SECURITY.md](SECURITY.md).
+Bug reports, ideas and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md). Security issues: see [SECURITY.md](SECURITY.md).
 
 ## License
 

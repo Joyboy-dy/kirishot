@@ -1,0 +1,36 @@
+name: Bug report
+description: Something does not work as expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The steps that lead to the problem, what you expected, and what happened instead.
+      placeholder: |
+        1. Press Win + Shift + S
+        2. …
+        Expected: …
+        Got: …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Kirishot version
+      description: Shown on the About page.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Settings › System › About (for example Windows 11 24H2), and your display scaling if several screens are involved.
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots, recording or logs
+      description: Drag files here. Logs are in About › Logs folder.
