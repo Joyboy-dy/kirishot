@@ -73,6 +73,10 @@ export const commands = {
 	openLogsFolder: () => typedError<null, KirishotError>(__TAURI_INVOKE("open_logs_folder")),
 	/**  Kirishot's repository, in the browser (« À propos »). */
 	openRepository: () => typedError<null, KirishotError>(__TAURI_INVOKE("open_repository")),
+	/**  The file name a template gives now, for the live preview under the field. */
+	previewName: (template: string) => typedError<string, KirishotError>(__TAURI_INVOKE("preview_name", { template })),
+	/**  The history folder, in the Explorer. */
+	historyOpenFolder: () => typedError<null, KirishotError>(__TAURI_INVOKE("history_open_folder")),
 	/**  Every capture of the history, newest first. */
 	historyList: () => typedError<HistoryEntry[], KirishotError>(__TAURI_INVOKE("history_list")),
 	/**  The thumbnail file of a capture, for `convertFileSrc`. */

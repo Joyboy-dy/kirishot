@@ -1,12 +1,9 @@
 import { useState } from 'react';
-import { t } from '@/i18n';
 import { AboutPage } from './about/AboutPage';
 import { HistoryPage } from './history/HistoryPage';
-import { Page } from './Page';
+import { SettingsPage } from './settings/SettingsPage';
 import { ShortcutsPage } from './shortcuts/ShortcutsPage';
 import { DEFAULT_ROUTE, type Route } from './routes';
-import { CaptureSettings } from './settings/CaptureSettings';
-import { GeneralSettings } from './settings/GeneralSettings';
 import { Sidebar } from './Sidebar';
 
 /** The main window: sidebar and the page it selects (spec J3 § 4.1). */
@@ -21,14 +18,7 @@ export function App() {
       {route === 'about' && <AboutPage />}
       {route === 'history' && <HistoryPage />}
       {route === 'shortcuts' && <ShortcutsPage />}
-      {route === 'settings' && (
-        <Page title={t('main.settings')}>
-          <GeneralSettings />
-          <div className="max-w-[760px]">
-            <CaptureSettings />
-          </div>
-        </Page>
-      )}
+      {route === 'settings' && <SettingsPage />}
     </div>
   );
 }

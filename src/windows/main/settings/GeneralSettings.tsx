@@ -1,22 +1,24 @@
 import { open } from '@tauri-apps/plugin-dialog';
 import { FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { commands, type AutoAction, type ImageFormat } from '@/lib/ipc';
+import { commands, type ImageFormat, type Theme } from '@/lib/ipc';
 import { NO_CHANGE } from '@/lib/settings';
 import { t, type MessageKey } from '@/i18n';
-import { useSettings } from '../useSettings';
-import { Row, Section } from './Layout';
+import type { useSettings } from '../useSettings';
+import { Choice, Row, Section, SwitchRow } from './Layout';
+import { NameTemplate } from './NameTemplate';
 
 const FORMATS: ImageFormat[] = ['png', 'jpg', 'webp'];
 const FORMAT_LABELS: Record<ImageFormat, string> = { png: 'PNG', jpg: 'JPG', webp: 'WebP' };
-const ACTIONS: AutoAction[] = ['saveAndCopy', 'copy', 'save'];
+const THEMES: Theme[] = ['system', 'dark', 'light'];
 
-/** Settings › General, J1 subset: destination folder, format, automatic action (spec § 3.9). */
-export function GeneralSettings() {
-  const { view, update, error } = useSettings();
-  if (!view) return null;
+type Settings = ReturnType<typeof useSettings>;
+
+/** Réglages › Général: where and how captures are saved, startup and theme (spec J3 § 4.4). */
+export function GeneralSettings({
+  view,
+  update,
+}: Pick<Settings, 'update'> & { view: NonNullable<Settings['view']> }) {
   const { settings } = view;
 
   const chooseFolder = async () => {
@@ -27,7 +29,7 @@ export function GeneralSettings() {
   };
 
   return (
-    <div className="flex max-w-[760px] flex-col gap-8">
+    <>
       <Section title={t('settings.saving')}>
         <Row label={t('settings.folder')} hint={view.saveFolderDisplay}>
           <Button variant="secondary" onClick={() => void commands.openSaveFolder()}>
@@ -54,52 +56,40 @@ export function GeneralSettings() {
           label={t('settings.format')}
           hint={t(`settings.format.${settings.save.format}` as MessageKey)}
         >
-          <ToggleGroup
-            type="single"
-            variant="outline"
+          <Choice
+            label={t('settings.format')}
             value={settings.save.format}
-            onValueChange={(v) => {
-              if (v) void update({ ...NO_CHANGE, saveFormat: v as ImageFormat });
-            }}
-          >
-            {FORMATS.map((f) => (
-              <ToggleGroupItem
-                key={f}
-                value={f}
-                className="px-4 data-[state=on]:border-[var(--k-accent)] data-[state=on]:bg-[var(--k-accent-soft)] data-[state=on]:text-[var(--k-accent-text)]"
-              >
-                {FORMAT_LABELS[f]}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+            options={FORMATS.map((f) => ({ value: f, label: FORMAT_LABELS[f] }))}
+            onChange={(saveFormat) => void update({ ...NO_CHANGE, saveFormat })}
+          />
+        </Row>
+        <Row label={t('settings.nameTemplate')} hint={t('settings.nameTemplate.hint')}>
+          <NameTemplate
+            value={settings.save.nameTemplate}
+            onChange={(nameTemplate) => void update({ ...NO_CHANGE, nameTemplate })}
+          />
         </Row>
       </Section>
 
-      <Section title={t('settings.afterCapture')}>
-        <Row label={t('settings.autoAction')} hint={t('settings.autoAction.hint')}>
-          <RadioGroup
-            value={settings.afterCapture.autoAction}
-            onValueChange={(v) => void update({ ...NO_CHANGE, autoAction: v as AutoAction })}
-            className="gap-2.5"
-          >
-            {ACTIONS.map((a) => (
-              <label key={a} className="flex cursor-pointer items-center gap-2.5 text-[13.5px]">
-                <RadioGroupItem
-                  value={a}
-                  className="data-[state=checked]:border-primary data-[state=checked]:bg-primary"
-                />
-                {t(`settings.action.${a}` as MessageKey)}
-              </label>
-            ))}
-          </RadioGroup>
+      <Section title={t('settings.system')}>
+        <SwitchRow
+          label={t('settings.launchAtStartup')}
+          hint={t('settings.launchAtStartup.hint')}
+          checked={settings.system.launchAtStartup}
+          onChange={(launchAtStartup) => void update({ ...NO_CHANGE, launchAtStartup })}
+        />
+        <Row label={t('settings.theme')} hint={t('settings.theme.hint')}>
+          <Choice
+            label={t('settings.theme')}
+            value={settings.system.theme}
+            options={THEMES.map((v) => ({
+              value: v,
+              label: t(`settings.theme.${v}` as MessageKey),
+            }))}
+            onChange={(theme) => void update({ ...NO_CHANGE, theme })}
+          />
         </Row>
       </Section>
-
-      {error && (
-        <p className="m-0 text-[13px]" style={{ color: 'var(--k-danger)' }}>
-          {error}
-        </p>
-      )}
-    </div>
+    </>
   );
 }

@@ -23,6 +23,8 @@
     "allow-open-repository",
     "allow-shortcut-set",
     "allow-shortcut-default",
-    "allow-shortcut-record"
+    "allow-shortcut-record",
+    "allow-preview-name",
+    "allow-history-open-folder"
   ]
 }

@@ -526,6 +526,38 @@ pub async fn shortcut_default(slot: crate::hotkeys::BindingSlot) -> KResult<Opti
     Ok(crate::hotkeys::default_binding(slot))
 }
 
+/// The file name a template gives now, for the live preview under the field.
+#[tauri::command]
+#[specta::specta]
+pub async fn preview_name(
+    state: tauri::State<'_, SettingsState>,
+    template: String,
+) -> KResult<String> {
+    let settings = state.get();
+    let stem = crate::output::filename::render_name(
+        &template,
+        &crate::output::filename::NameContext {
+            taken_at: chrono::Local::now().naive_local(),
+            window_title: Some("Paramètres du compte".into()),
+            counter: settings.save.counter,
+        },
+    );
+    Ok(format!("{stem}.{}", settings.save.format.extension()))
+}
+
+/// The history folder, in the Explorer.
+#[tauri::command]
+#[specta::specta]
+pub async fn history_open_folder(app: tauri::AppHandle) -> KResult<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let dir = paths::history_dir();
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| KirishotError::new(ErrorCode::Save, e.to_string()))?;
+    app.opener()
+        .open_path(dir.to_string_lossy(), None::<&str>)
+        .map_err(|e| KirishotError::new(ErrorCode::Save, e.to_string()))
+}
+
 /// Every capture of the history, newest first.
 #[tauri::command]
 #[specta::specta]
@@ -672,6 +704,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             shortcut_record,
             open_logs_folder,
             open_repository,
+            preview_name,
+            history_open_folder,
             history_list,
             history_thumb_path,
             history_copy,

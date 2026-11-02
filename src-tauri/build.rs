@@ -43,6 +43,8 @@ fn main() {
                 "shortcut_record",
                 "open_logs_folder",
                 "open_repository",
+                "preview_name",
+                "history_open_folder",
                 "history_list",
                 "history_thumb_path",
                 "history_copy",
