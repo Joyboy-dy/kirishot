@@ -1,45 +1,7 @@
 import { X } from 'lucide-react';
 import { Kbd } from '@/components/ui/Kbd';
-import { t, type MessageKey } from '@/i18n';
-
-type Entry = { keys: string[]; action: MessageKey };
-
-const GROUPS: { title: MessageKey; entries: Entry[] }[] = [
-  {
-    title: 'sheet.selection',
-    entries: [
-      { keys: ['Glisser'], action: 'sheet.drag' },
-      { keys: ['Maj'], action: 'sheet.shift' },
-      { keys: ['Alt'], action: 'sheet.alt' },
-      { keys: ['Espace'], action: 'sheet.space' },
-      { keys: ['←', '↑', '→', '↓'], action: 'sheet.arrows' },
-    ],
-  },
-  {
-    title: 'sheet.modes',
-    entries: [
-      { keys: ['R'], action: 'sheet.region' },
-      { keys: ['W'], action: 'sheet.window' },
-      { keys: ['F'], action: 'sheet.fullscreen' },
-    ],
-  },
-  {
-    title: 'sheet.magnifier',
-    entries: [
-      { keys: ['M'], action: 'sheet.loupe' },
-      { keys: ['C'], action: 'sheet.color' },
-    ],
-  },
-  {
-    title: 'sheet.validate',
-    entries: [
-      { keys: ['Entrée'], action: 'sheet.enter' },
-      { keys: ['Ctrl', 'C'], action: 'sheet.copy' },
-      { keys: ['Échap'], action: 'sheet.escape' },
-      { keys: ['?'], action: 'sheet.help' },
-    ],
-  },
-];
+import { t } from '@/i18n';
+import { SELECTION_SHORTCUTS } from '@/lib/shortcuts';
 
 /** Every shortcut of the selection screen, on demand with « ? » (spec J2.1 § 2.2). */
 export function ShortcutSheet({ onClose }: { onClose(): void }) {
@@ -75,23 +37,23 @@ export function ShortcutSheet({ onClose }: { onClose(): void }) {
         </button>
       </div>
       <div className="grid grid-cols-2 gap-x-8 gap-y-5">
-        {GROUPS.map((g) => (
+        {SELECTION_SHORTCUTS.map((g) => (
           <section key={g.title}>
             <h3
               className="m-0 mb-2 text-[11px] font-semibold uppercase tracking-wide"
               style={{ color: 'var(--k-text-3)' }}
             >
-              {t(g.title)}
+              {g.title}
             </h3>
             <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
               {g.entries.map((entry) => (
-                <li key={entry.action} className="flex items-center gap-2 text-[13px]">
+                <li key={entry.label} className="flex items-center gap-2 text-[13px]">
                   <span className="flex shrink-0 gap-1">
                     {entry.keys.map((k) => (
                       <Kbd key={k}>{k}</Kbd>
                     ))}
                   </span>
-                  <span style={{ color: 'var(--k-text-2)' }}>{t(entry.action)}</span>
+                  <span style={{ color: 'var(--k-text-2)' }}>{entry.label}</span>
                 </li>
               ))}
             </ul>

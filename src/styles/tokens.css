@@ -38,6 +38,21 @@
   }
 }
 
+/* The theme setting forces light (spec J3 § 4.4). */
+:root[data-theme='light'] {
+  --k-bg: #f4f5f7;
+  --k-surface: #ffffff;
+  --k-surface-2: #eef0f3;
+  --k-surface-3: #e4e7ec;
+  --k-border: #dadde3;
+  --k-text: #14161b;
+  --k-text-2: #4a5060;
+  --k-text-3: #5f6676;
+  --k-glass: rgba(255, 255, 255, 0.92);
+  --k-accent-text: color-mix(in srgb, var(--k-accent) 65%, #000);
+  color-scheme: light;
+}
+
 /* shadcn/ui variables mapped onto the Kirishot tokens. */
 @theme inline {
   --font-sans: 'Geist Variable', system-ui, sans-serif;

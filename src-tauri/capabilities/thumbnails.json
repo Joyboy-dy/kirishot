@@ -15,6 +15,7 @@
     "allow-thumbnail-delete",
     "allow-thumbnail-reveal",
     "allow-thumbnail-copy-path",
-    "drag:default"
+    "drag:default",
+    "allow-settings-get"
   ]
 }
