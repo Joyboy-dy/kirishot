@@ -73,3 +73,58 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+/* Motion and interaction rules shared by every window (spec J2 § 5). */
+:root {
+  --k-ease-in: cubic-bezier(0.2, 0, 0, 1);
+  --k-ease-out: cubic-bezier(0.4, 0, 1, 1);
+  --k-dur-fast: 150ms;
+  --k-dur-panel: 220ms;
+}
+
+@layer base {
+  button,
+  a[href],
+  summary,
+  select,
+  [role='button'],
+  [role='radio'],
+  [role='checkbox'],
+  [role='switch'],
+  [role='tab'],
+  [role='menuitem'],
+  label:has(input, button, [role='radio'], [role='checkbox'], [role='switch']) {
+    cursor: pointer;
+  }
+
+  :disabled,
+  [aria-disabled='true'],
+  [data-disabled] {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--k-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* A pressed control sinks slightly. */
+.k-press {
+  transition:
+    transform var(--k-dur-fast) var(--k-ease-in),
+    background-color var(--k-dur-fast) var(--k-ease-in),
+    color var(--k-dur-fast) var(--k-ease-in);
+}
+.k-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
+}
