@@ -5,6 +5,9 @@ mod error;
 mod flow;
 mod frame;
 mod geometry;
+// Wired to the app in the next commit (J3 Task 5).
+#[allow(dead_code)]
+mod history;
 mod hotkeys;
 mod logging;
 mod messages;
