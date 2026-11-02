@@ -34,7 +34,7 @@ pub fn dibv5_from_rgba(img: &RgbaImage) -> Vec<u8> {
     u32s(&mut d, &[0, 0, 0, LCS_GM_IMAGES, 0, 0, 0]); // gammas, intent, profile, reserved
     debug_assert_eq!(d.len(), HEADER_SIZE as usize);
     for row in img.as_raw().chunks_exact((w * 4) as usize).rev() {
-        for p in row.chunks_exact(4) {
+        for p in row.as_chunks::<4>().0 {
             d.extend_from_slice(&[p[2], p[1], p[0], p[3]]);
         }
     }

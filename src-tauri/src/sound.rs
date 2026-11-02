@@ -126,8 +126,10 @@ mod tests {
         let limit = (0.6 * i16::MAX as f32) as i16;
         assert!(
             w[44..]
-                .chunks_exact(2)
-                .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|c| i16::from_le_bytes(*c))
                 .all(|s| s.saturating_abs() <= limit)
         );
     }
@@ -136,8 +138,10 @@ mod tests {
     fn shutter_is_not_silent() {
         let w = shutter_wav();
         let peak = w[44..]
-            .chunks_exact(2)
-            .map(|c| i16::from_le_bytes([c[0], c[1]]).saturating_abs())
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| i16::from_le_bytes(*c).saturating_abs())
             .max()
             .unwrap();
         assert!(peak > 8_000, "peak {peak}");
