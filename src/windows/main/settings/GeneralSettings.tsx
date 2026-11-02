@@ -4,11 +4,11 @@ import { FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { commands, type AutoAction, type ImageFormat, type SettingsPatch } from '@/lib/ipc';
+import { commands, type AutoAction, type ImageFormat } from '@/lib/ipc';
+import { NO_CHANGE } from '@/lib/settings';
 import { t, type MessageKey } from '@/i18n';
 import { useSettings } from '../useSettings';
 
-const NO_CHANGE: SettingsPatch = { saveFolder: null, saveFormat: null, autoAction: null };
 const FORMATS: ImageFormat[] = ['png', 'jpg', 'webp'];
 const FORMAT_LABELS: Record<ImageFormat, string> = { png: 'PNG', jpg: 'JPG', webp: 'WebP' };
 const ACTIONS: AutoAction[] = ['saveAndCopy', 'copy', 'save'];

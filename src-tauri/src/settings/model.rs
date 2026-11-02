@@ -30,15 +30,21 @@ pub struct SaveSettings {
 #[serde(rename_all = "camelCase")]
 pub struct AfterCaptureSettings {
     pub auto_action: AutoAction,
-    pub thumbnail_seconds: u8,
+    /// `false` keeps the J1 behavior: the action runs at once and a notification confirms it.
+    pub thumbnail: bool,
+    /// 3, 6 or 10; `None` keeps the thumbnail until it is closed.
+    pub thumbnail_seconds: Option<u8>,
     pub always_open_editor: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureSettings {
-    pub include_cursor: bool,
+    /// Whether the selection screen starts with its magnifier shown.
+    pub magnifier: bool,
     pub sound: bool,
+    pub flash: bool,
+    pub include_cursor: bool,
     pub tray_timer_seconds: u8,
     pub commit_on_release: bool,
 }
@@ -125,12 +131,15 @@ impl Default for Settings {
             },
             after_capture: AfterCaptureSettings {
                 auto_action: AutoAction::SaveAndCopy,
-                thumbnail_seconds: 5,
+                thumbnail: true,
+                thumbnail_seconds: Some(6),
                 always_open_editor: false,
             },
             capture: CaptureSettings {
+                magnifier: true,
+                sound: true,
+                flash: true,
                 include_cursor: false,
-                sound: false,
                 tray_timer_seconds: 3,
                 commit_on_release: false,
             },
@@ -172,6 +181,37 @@ pub struct SettingsPatch {
     pub save_folder: Option<FolderChoice>,
     pub save_format: Option<ImageFormat>,
     pub auto_action: Option<AutoAction>,
+    pub magnifier: Option<bool>,
+    pub sound: Option<bool>,
+    pub flash: Option<bool>,
+    pub thumbnail: Option<bool>,
+    pub thumbnail_duration: Option<ThumbnailDuration>,
+    pub always_open_editor: Option<bool>,
+}
+
+/// How long a thumbnail stays; a patch cannot carry `null` to mean "until closed".
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ThumbnailDuration {
+    Seconds { value: u8 },
+    UntilClosed,
+}
+
+impl SettingsPatch {
+    /// A patch that changes nothing.
+    pub fn empty() -> Self {
+        Self {
+            save_folder: None,
+            save_format: None,
+            auto_action: None,
+            magnifier: None,
+            sound: None,
+            flash: None,
+            thumbnail: None,
+            thumbnail_duration: None,
+            always_open_editor: None,
+        }
+    }
 }
 
 pub fn apply_patch(s: &mut Settings, p: SettingsPatch) {
@@ -186,6 +226,27 @@ pub fn apply_patch(s: &mut Settings, p: SettingsPatch) {
     }
     if let Some(action) = p.auto_action {
         s.after_capture.auto_action = action;
+    }
+    if let Some(on) = p.magnifier {
+        s.capture.magnifier = on;
+    }
+    if let Some(on) = p.sound {
+        s.capture.sound = on;
+    }
+    if let Some(on) = p.flash {
+        s.capture.flash = on;
+    }
+    if let Some(on) = p.thumbnail {
+        s.after_capture.thumbnail = on;
+    }
+    if let Some(duration) = p.thumbnail_duration {
+        s.after_capture.thumbnail_seconds = match duration {
+            ThumbnailDuration::Seconds { value } => Some(value),
+            ThumbnailDuration::UntilClosed => None,
+        };
+    }
+    if let Some(on) = p.always_open_editor {
+        s.after_capture.always_open_editor = on;
     }
 }
 
@@ -204,11 +265,11 @@ mod tests {
         );
         assert_eq!(
             v["afterCapture"],
-            json!({"autoAction": "saveAndCopy", "thumbnailSeconds": 5, "alwaysOpenEditor": false})
+            json!({"autoAction": "saveAndCopy", "thumbnail": true, "thumbnailSeconds": 6, "alwaysOpenEditor": false})
         );
         assert_eq!(
             v["capture"],
-            json!({"includeCursor": false, "sound": false, "trayTimerSeconds": 3, "commitOnRelease": false})
+            json!({"magnifier": true, "sound": true, "flash": true, "includeCursor": false, "trayTimerSeconds": 3, "commitOnRelease": false})
         );
         assert_eq!(
             v["shortcuts"],
@@ -233,7 +294,7 @@ mod tests {
                     path: r"D:\Captures".into(),
                 }),
                 save_format: Some(ImageFormat::Jpg),
-                auto_action: None,
+                ..SettingsPatch::empty()
             },
         );
         assert_eq!(s.save.folder.as_deref(), Some(r"D:\Captures"));
@@ -243,11 +304,48 @@ mod tests {
             &mut s,
             SettingsPatch {
                 save_folder: Some(FolderChoice::Default),
-                save_format: None,
-                auto_action: None,
+                ..SettingsPatch::empty()
             },
         );
         assert_eq!(s.save.folder, None);
+    }
+
+    #[test]
+    fn j2_defaults() {
+        let s = Settings::default();
+        assert!(s.after_capture.thumbnail);
+        assert_eq!(s.after_capture.thumbnail_seconds, Some(6));
+        assert!(s.capture.magnifier && s.capture.sound && s.capture.flash);
+    }
+
+    #[test]
+    fn patch_sets_capture_toggles_and_duration() {
+        let mut s = Settings::default();
+        apply_patch(
+            &mut s,
+            SettingsPatch {
+                sound: Some(false),
+                magnifier: Some(false),
+                thumbnail_duration: Some(ThumbnailDuration::UntilClosed),
+                ..SettingsPatch::empty()
+            },
+        );
+        assert!(!s.capture.sound && !s.capture.magnifier);
+        assert!(s.capture.flash);
+        assert_eq!(s.after_capture.thumbnail_seconds, None);
+        apply_patch(
+            &mut s,
+            SettingsPatch {
+                flash: Some(false),
+                thumbnail: Some(false),
+                always_open_editor: Some(true),
+                thumbnail_duration: Some(ThumbnailDuration::Seconds { value: 10 }),
+                ..SettingsPatch::empty()
+            },
+        );
+        assert!(!s.capture.flash && !s.after_capture.thumbnail);
+        assert!(s.after_capture.always_open_editor);
+        assert_eq!(s.after_capture.thumbnail_seconds, Some(10));
     }
 
     #[test]

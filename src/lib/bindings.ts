@@ -32,7 +32,10 @@ export const events = {
 /* Types */
 export type AfterCaptureSettings = {
 	autoAction: AutoAction,
-	thumbnailSeconds: number,
+	/**  `false` keeps the J1 behavior: the action runs at once and a notification confirms it. */
+	thumbnail: boolean,
+	/**  3, 6 or 10; `None` keeps the thumbnail until it is closed. */
+	thumbnailSeconds: number | null,
 	alwaysOpenEditor: boolean,
 };
 
@@ -43,8 +46,11 @@ export type AppInfo = {
 export type AutoAction = "saveAndCopy" | "copy" | "save";
 
 export type CaptureSettings = {
-	includeCursor: boolean,
+	/**  Whether the selection screen starts with its magnifier shown. */
+	magnifier: boolean,
 	sound: boolean,
+	flash: boolean,
+	includeCursor: boolean,
 	trayTimerSeconds: number,
 	commitOnRelease: boolean,
 };
@@ -145,6 +151,12 @@ export type SettingsPatch = {
 	saveFolder: FolderChoice | null,
 	saveFormat: ImageFormat | null,
 	autoAction: AutoAction | null,
+	magnifier: boolean | null,
+	sound: boolean | null,
+	flash: boolean | null,
+	thumbnail: boolean | null,
+	thumbnailDuration: ThumbnailDuration | null,
+	alwaysOpenEditor: boolean | null,
 };
 
 /**  What the settings page displays: the settings plus the resolved destination folder. */
@@ -172,6 +184,9 @@ export type SystemSettings = {
 };
 
 export type Theme = "system" | "dark" | "light";
+
+/**  How long a thumbnail stays; a patch cannot carry `null` to mean "until closed". */
+export type ThumbnailDuration = { kind: "seconds"; value: number } | { kind: "untilClosed" };
 
 /**  A visible top-level window. Lists of windows are ordered topmost first. */
 export type WindowInfo = {

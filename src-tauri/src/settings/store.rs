@@ -154,10 +154,10 @@ pub fn validate(mut s: Settings) -> (Settings, Vec<String>) {
         reset("version", s.version.to_string(), &mut warnings);
         s.version = 1;
     }
-    if ![3, 5, 10].contains(&s.after_capture.thumbnail_seconds) {
+    if !matches!(s.after_capture.thumbnail_seconds, None | Some(3 | 6 | 10)) {
         reset(
             "afterCapture.thumbnailSeconds",
-            s.after_capture.thumbnail_seconds.to_string(),
+            format!("{:?}", s.after_capture.thumbnail_seconds),
             &mut warnings,
         );
         s.after_capture.thumbnail_seconds = defaults.after_capture.thumbnail_seconds;
@@ -255,7 +255,7 @@ mod tests {
     #[test]
     fn validate_resets_out_of_range_values() {
         let mut s = Settings::default();
-        s.after_capture.thumbnail_seconds = 7;
+        s.after_capture.thumbnail_seconds = Some(7);
         s.capture.tray_timer_seconds = 4;
         s.history.retention_days = Some(15);
         s.save.counter = 0;
@@ -267,13 +267,44 @@ mod tests {
                 s.after_capture.thumbnail_seconds,
                 s.capture.tray_timer_seconds
             ),
-            (5, 3)
+            (Some(6), 3)
         );
         assert_eq!(s.history.retention_days, Some(30));
         assert_eq!(s.save.counter, 1);
         assert_eq!(s.save.folder, None);
         assert_eq!(s.save.name_template, "Kirishot {date} à {heure}");
         assert_eq!(w.len(), 6);
+    }
+
+    #[test]
+    fn j1_file_gains_j2_fields() {
+        let file = json!({
+            "version": 1,
+            "afterCapture": {"autoAction": "copy", "thumbnailSeconds": 5},
+            "capture": {"sound": false}
+        });
+        let (s, _) = repair(file);
+        let (s, _) = validate(s);
+        assert_eq!(s.after_capture.auto_action, AutoAction::Copy);
+        assert_eq!(s.after_capture.thumbnail_seconds, Some(6));
+        assert!(!s.capture.sound);
+        assert!(s.capture.magnifier && s.capture.flash && s.after_capture.thumbnail);
+    }
+
+    #[test]
+    fn thumbnail_seconds_accepts_null_and_3_6_10() {
+        for v in [None, Some(3), Some(6), Some(10)] {
+            let mut s = Settings::default();
+            s.after_capture.thumbnail_seconds = v;
+            assert_eq!(validate(s).0.after_capture.thumbnail_seconds, v);
+        }
+    }
+
+    #[test]
+    fn null_thumbnail_seconds_survives_repair() {
+        let (s, w) = repair(json!({"afterCapture": {"thumbnailSeconds": null}}));
+        assert_eq!(s.after_capture.thumbnail_seconds, None);
+        assert!(w.is_empty(), "{w:?}");
     }
 
     #[test]
