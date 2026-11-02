@@ -21,6 +21,11 @@ pub fn logs_dir() -> PathBuf {
     app_root().join("logs")
 }
 
+/// `%TEMP%\Kirishot`: the thumbnails' PNG files, cleared at startup.
+pub fn temp_dir() -> PathBuf {
+    std::env::temp_dir().join("Kirishot")
+}
+
 pub fn settings_file() -> PathBuf {
     app_root().join("settings.json")
 }

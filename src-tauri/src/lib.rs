@@ -16,6 +16,9 @@ mod settings;
 mod shots;
 mod sound;
 mod store;
+// Wired in J2 task 8.
+#[allow(dead_code)]
+mod thumbnails;
 mod tray;
 mod windowing;
 
@@ -57,6 +60,8 @@ pub fn run() {
                     messages::SETTINGS_RESET_BODY,
                 );
             }
+            // Thumbnail files from a previous run are never shown again.
+            thumbnails::temp::clear(&paths::temp_dir());
             let shortcuts = loaded.settings.shortcuts.clone();
             app.manage(settings::SettingsState::new(
                 paths::settings_file(),
