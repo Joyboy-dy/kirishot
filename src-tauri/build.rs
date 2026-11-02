@@ -30,6 +30,7 @@ fn main() {
                 "thumbnail_copy_path",
                 "editor_loaded",
                 "editor_close",
+                "editor_export",
             ])),
     )
     .expect("failed to run tauri-build");

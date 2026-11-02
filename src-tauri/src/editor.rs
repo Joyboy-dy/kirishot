@@ -174,6 +174,144 @@ pub fn close(app: &tauri::AppHandle) {
     }
 }
 
+/// What an export did, for the editor's status bar.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportResult {
+    /// The file written, if any.
+    pub saved: Option<String>,
+    pub copied: bool,
+    /// « Enregistrer sous » cancelled by the user.
+    pub cancelled: bool,
+    /// The file went to `Images\Kirishot` because the chosen folder could not be written.
+    pub used_fallback: bool,
+}
+
+/// Copies and/or saves the editor's final image (PNG bytes from the page).
+pub fn export(
+    app: &tauri::AppHandle,
+    capture_id: &str,
+    intent: ExportIntent,
+    png: Vec<u8>,
+) -> KResult<ExportResult> {
+    let invalid = |e: &dyn std::fmt::Display| {
+        KirishotError::new(
+            ErrorCode::Encode,
+            format!("Image de l'éditeur illisible : {e}"),
+        )
+    };
+    let img = image::load_from_memory_with_format(&png, image::ImageFormat::Png)
+        .map_err(|e| invalid(&e))?
+        .to_rgba8();
+    let meta = app
+        .state::<ShotStore>()
+        .get(capture_id)
+        .map(|s| s.meta)
+        .ok_or_else(|| KirishotError::new(ErrorCode::NoActiveCapture, "Capture introuvable"))?;
+    let mut result = ExportResult {
+        saved: None,
+        copied: false,
+        cancelled: false,
+        used_fallback: false,
+    };
+    match intent {
+        ExportIntent::Copy | ExportIntent::CopyAndClose => {
+            crate::output::copy_image(app, &img, &mut Some(png))?;
+            result.copied = true;
+        }
+        ExportIntent::Save => {
+            let saved = crate::output::save_image(app, &img, &meta)?;
+            result.used_fallback = saved.used_fallback;
+            result.saved = Some(saved.path.to_string_lossy().into_owned());
+        }
+        ExportIntent::SaveAs => match save_as(app, &img, &meta)? {
+            Some(path) => result.saved = Some(path),
+            None => result.cancelled = true,
+        },
+    }
+    if intent == ExportIntent::CopyAndClose {
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || close(&handle));
+    }
+    Ok(result)
+}
+
+/// Asks where to save, with the usual name, folder and format; `None` when cancelled.
+fn save_as(
+    app: &tauri::AppHandle,
+    img: &image::RgbaImage,
+    meta: &crate::output::CaptureMeta,
+) -> KResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+    let settings = app.state::<crate::settings::SettingsState>().get();
+    let default_folder = crate::paths::default_save_folder(app)?;
+    let folder = crate::settings::resolve_save_folder(&settings, &default_folder);
+    let format = settings.save.format;
+    let stem = crate::output::filename::render_name(
+        &settings.save.name_template,
+        &crate::output::filename::NameContext {
+            taken_at: meta.taken_at.naive_local(),
+            window_title: meta.window_title.clone(),
+            counter: settings.save.counter,
+        },
+    );
+    let Some(chosen) = app
+        .dialog()
+        .file()
+        .set_directory(&folder)
+        .set_file_name(format!("{stem}.{}", format.extension()))
+        .add_filter("PNG", &["png"])
+        .add_filter("JPG", &["jpg", "jpeg"])
+        .add_filter("WebP", &["webp"])
+        .blocking_save_file()
+    else {
+        return Ok(None);
+    };
+    let path = chosen
+        .into_path()
+        .map_err(|e| KirishotError::new(ErrorCode::Save, e.to_string()))?;
+    let chosen_format = match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("jpg" | "jpeg") => crate::settings::model::ImageFormat::Jpg,
+        Some("webp") => crate::settings::model::ImageFormat::Webp,
+        _ => crate::settings::model::ImageFormat::Png,
+    };
+    let bytes = crate::output::encode::encode(img, chosen_format)?;
+    std::fs::write(&path, bytes).map_err(|e| {
+        KirishotError::new(
+            ErrorCode::Save,
+            format!("Impossible d'enregistrer la capture : {e}"),
+        )
+    })?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+/// What the editor asks for with its exported image.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportIntent {
+    Copy,
+    Save,
+    SaveAs,
+    CopyAndClose,
+}
+
+pub fn parse_intent(header: Option<&str>) -> KResult<ExportIntent> {
+    match header {
+        Some("copy") => Ok(ExportIntent::Copy),
+        Some("save") => Ok(ExportIntent::Save),
+        Some("saveAs") => Ok(ExportIntent::SaveAs),
+        Some("copyAndClose") => Ok(ExportIntent::CopyAndClose),
+        other => Err(KirishotError::new(
+            ErrorCode::InvalidSelection,
+            format!("Export inconnu : {other:?}"),
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,5 +330,22 @@ mod tests {
             .and_hms_opt(9, 56, 12)
             .unwrap();
         assert_eq!(editor_title(at), "Capture du 02/11/2026 à 09:56");
+    }
+
+    #[test]
+    fn parse_intent_reads_the_four_actions() {
+        assert_eq!(parse_intent(Some("copy")).unwrap(), ExportIntent::Copy);
+        assert_eq!(parse_intent(Some("save")).unwrap(), ExportIntent::Save);
+        assert_eq!(parse_intent(Some("saveAs")).unwrap(), ExportIntent::SaveAs);
+        assert_eq!(
+            parse_intent(Some("copyAndClose")).unwrap(),
+            ExportIntent::CopyAndClose
+        );
+    }
+
+    #[test]
+    fn parse_intent_rejects_missing_or_unknown() {
+        assert!(parse_intent(None).is_err());
+        assert!(parse_intent(Some("print")).is_err());
     }
 }

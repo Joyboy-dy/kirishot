@@ -21,6 +21,13 @@ mod windowing;
 
 use tauri::Manager;
 
+/// Commands that take a raw request body, which tauri-specta cannot type.
+fn raw_commands(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
+    let handler: &dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool =
+        &tauri::generate_handler![commands::editor_export];
+    handler(invoke)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = commands::specta_builder();
@@ -46,7 +53,13 @@ pub fn run() {
         .manage(editor::EditorState::default())
         .manage(flow::FlowState::default())
         .manage(windowing::OverlaySet::default())
-        .invoke_handler(builder.invoke_handler())
+        .invoke_handler({
+            let typed = builder.invoke_handler();
+            move |invoke: tauri::ipc::Invoke<tauri::Wry>| match invoke.message.command() {
+                "editor_export" => raw_commands(invoke),
+                _ => typed(invoke),
+            }
+        })
         .setup(move |app| {
             builder.mount_events(app);
             let loaded = settings::store::load(&paths::settings_file());

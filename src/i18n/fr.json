@@ -78,7 +78,6 @@
   "editor.copy": "Copier",
   "editor.save": "Enregistrer",
   "editor.copyAndClose": "Copier et fermer",
-  "editor.soon": "Bientôt disponible",
   "editor.selection": "Réglages de la sélection",
   "editor.dash.solid": "Trait plein",
   "editor.dash.dashed": "Tirets",
@@ -89,5 +88,9 @@
   "editor.textStyle.outline": "Contour",
   "editor.front": "Premier plan",
   "editor.back": "Arrière-plan",
-  "editor.delete": "Supprimer"
+  "editor.delete": "Supprimer",
+  "editor.copied": "Copiée dans le presse-papiers",
+  "editor.saved": "Enregistrée : {name}",
+  "editor.savedFallback": "Dossier inaccessible, enregistrée dans Images › Kirishot : {name}",
+  "editor.exportFailed": "Échec de l'export : {message}"
 }

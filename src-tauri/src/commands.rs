@@ -162,6 +162,35 @@ pub async fn editor_loaded(window: tauri::WebviewWindow) -> KResult<()> {
     editor::mark_loaded(&window)
 }
 
+/// The editor's final image as raw PNG bytes (no JSON): the headers say which capture and what
+/// to do with it. Registered outside tauri-specta, which cannot type a raw request.
+#[tauri::command]
+pub async fn editor_export(
+    app: tauri::AppHandle,
+    request: tauri::ipc::Request<'_>,
+) -> KResult<editor::ExportResult> {
+    let header = |name: &str| {
+        request
+            .headers()
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string)
+    };
+    let intent = editor::parse_intent(header("x-kirishot-intent").as_deref())?;
+    let capture_id = header("x-kirishot-capture")
+        .ok_or_else(|| KirishotError::new(ErrorCode::InvalidSelection, "Capture inconnue"))?;
+    let tauri::ipc::InvokeBody::Raw(png) = request.body() else {
+        return Err(KirishotError::new(
+            ErrorCode::InvalidSelection,
+            "Image manquante",
+        ));
+    };
+    let png = png.clone();
+    tauri::async_runtime::spawn_blocking(move || editor::export(&app, &capture_id, intent, png))
+        .await
+        .map_err(|e| KirishotError::new(ErrorCode::Internal, e.to_string()))?
+}
+
 /// Closes the editor and frees its capture.
 #[tauri::command]
 #[specta::specta]
@@ -297,6 +326,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         // Sent as the shared buffer's additionalData, never as a command result.
         .typ::<OverlaySession>()
         .typ::<EditorSession>()
+        .typ::<editor::ExportResult>()
 }
 
 /// Writes `src/lib/bindings.ts`, which the front end imports through `src/lib/ipc.ts`.

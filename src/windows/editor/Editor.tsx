@@ -21,6 +21,7 @@ import { commands } from '@/lib/ipc';
 import { t } from '@/i18n';
 import { Canvas, type CanvasPointer } from './Canvas';
 import { ContextBubble } from './ContextBubble';
+import { exportImage, type ExportIntent } from './export';
 import { keyAction, type EditorAction } from './keys';
 import { StatusBar } from './StatusBar';
 import { TopBar, type Style } from './TopBar';
@@ -147,7 +148,29 @@ export function Editor() {
   };
   const zoomBy = (factor: number) =>
     setView((v) => zoomAt(v, factor, { x: box.width / 2, y: box.height / 2 }));
-  const notYet = () => setMessage({ text: t('editor.soon'), error: false });
+  const [busy, setBusy] = useState(false);
+  const runExport = (intent: ExportIntent) => {
+    if (!doc || !stage || busy) return;
+    setBusy(true);
+    setSelected([]);
+    exportImage(stage, doc, view, intent)
+      .then((r) => {
+        if (r.cancelled) return;
+        const name = r.saved?.split(/[\\/]/).pop() ?? '';
+        const text = r.saved
+          ? r.usedFallback
+            ? t('editor.savedFallback', { name })
+            : t('editor.saved', { name })
+          : t('editor.copied');
+        setMessage({ text, error: false });
+      })
+      .catch((e: unknown) => {
+        const text =
+          e instanceof Error ? e.message : ((e as { message?: string }).message ?? String(e));
+        setMessage({ text: t('editor.exportFailed', { message: text }), error: true });
+      })
+      .finally(() => setBusy(false));
+  };
 
   const changeTool = (next: ToolId) => {
     setTool(next);
@@ -214,7 +237,7 @@ export function Editor() {
       case 'save':
       case 'saveAs':
       case 'copyAndClose':
-        return notYet();
+        return runExport(action.type);
     }
   };
 
@@ -367,14 +390,14 @@ export function Editor() {
         style={style}
         canUndo={(history?.past.length ?? 0) > 0}
         canRedo={(history?.future.length ?? 0) > 0}
-        busy={!doc}
+        busy={!doc || busy}
         onTool={changeTool}
         onStyle={applyStyle}
         onUndo={() => setHistory((h) => h && undo(h))}
         onRedo={() => setHistory((h) => h && redo(h))}
-        onCopy={notYet}
-        onSave={notYet}
-        onCopyAndClose={notYet}
+        onCopy={() => runExport('copy')}
+        onSave={() => runExport('save')}
+        onCopyAndClose={() => runExport('copyAndClose')}
       />
       <div
         ref={boxRef}

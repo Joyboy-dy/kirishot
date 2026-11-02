@@ -91,6 +91,17 @@ export type EditorSession = {
 /**  Stable error codes shared with the front end, which translates them. */
 export type ErrorCode = "capture" | "noActiveCapture" | "invalidSelection" | "encode" | "save" | "clipboard" | "settings" | "shortcut" | "window" | "internal";
 
+/**  What an export did, for the editor's status bar. */
+export type ExportResult = {
+	/**  The file written, if any. */
+	saved: string | null,
+	copied: boolean,
+	/**  « Enregistrer sous » cancelled by the user. */
+	cancelled: boolean,
+	/**  The file went to `Images\Kirishot` because the chosen folder could not be written. */
+	usedFallback: boolean,
+};
+
 /**  Destination folder chosen in the settings page. */
 export type FolderChoice = { kind: "default" } | { kind: "custom"; path: string };
 
