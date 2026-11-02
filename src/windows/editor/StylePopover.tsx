@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { Popover } from 'radix-ui';
-import { Tip } from '@/components/ui/Tip';
+import { Tip, TipSideProvider } from '@/components/ui/Tip';
 import type { Block, Fill, Stroke, TextStyle } from '@/editor/document';
 import { PALETTE, type SizeStep } from '@/editor/style';
 import { t, type MessageKey } from '@/i18n';
@@ -281,7 +281,8 @@ function Menu(p: { trigger: ReactNode; label: string; children: ReactNode }) {
           className="z-50 flex max-w-[min(360px,calc(100vw-16px))] flex-wrap items-center gap-1 rounded-xl p-2"
           style={MENU_STYLE}
         >
-          {p.children}
+          {/* The menu opens downward: a tip above its item covers where the pointer came from. */}
+          <TipSideProvider side="top">{p.children}</TipSideProvider>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

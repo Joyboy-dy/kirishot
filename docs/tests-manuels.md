@@ -167,3 +167,10 @@
 102. Capture enregistrée par la vignette, annotée, fermée avec « Ne pas enregistrer », puis rouverte depuis l'Historique : le bouton Enregistrer est actif et la fermeture demande d'enregistrer. Une capture rouverte sans changement depuis son dernier enregistrement reste grisée.
 103. Supprimer à la main un dossier de `%APPDATA%\Kirishot\history` puis relancer Kirishot : la capture disparaît de l'Historique, sans carte vide.
 104. Raccourcis : cliquer sur une ligne, passer dans une autre application et taper Ctrl+S : rien n'est enregistré et Ctrl+S marche normalement là-bas. Fermer la fenêtre pendant l'attente : Win + Maj + S capture toujours. Maj+A ou Alt+1 ne sont pas acceptés comme raccourci.
+
+## J3.1 : finitions
+
+105. À propos, Réglages : entre le titre d'une section et sa carte, un vrai espace ; aucun trait collé en haut de la carte, un trait fin seulement entre deux lignes. Historique : le pied a de l'air au-dessus de son trait.
+106. Outil Sélection : flèche sur le vide, main ouverte sur une annotation, main fermée pendant le déplacement ; flèches de redimensionnement sur les poignées d'un cadre ; main sur les extrémités et la courbure d'une flèche. Outils de dessin : croix, même sur une annotation ; Texte : curseur texte ; Espace : main.
+107. Tracer un cadre : l'outil Rectangle reste actif, un second cadre se trace aussitôt. Réglages › Après capture › Éditeur › « Après une annotation » sur « Revenir à la sélection » : après le tracé, l'outil Sélection est actif et le cadre est sélectionné, avec ses poignées.
+108. Ouvrir Style : aucune info-bulle ne s'ouvre seule ; en survolant une option, l'info-bulle vient après un court instant, au-dessus de l'option. Fermer le menu à la souris : pas d'info-bulle sur le bouton Style. Au clavier (Tab), les info-bulles s'affichent toujours.
