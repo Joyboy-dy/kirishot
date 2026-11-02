@@ -1,23 +1,103 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
-import { newDoc } from '@/editor/document';
-import { init, redo, undo, type History } from '@/editor/history';
-import { PALETTE } from '@/editor/style';
+import {
+  add,
+  duplicate,
+  newDoc,
+  newId,
+  remove,
+  reorder,
+  setCrop,
+  translate,
+  update,
+  type Annotation,
+  type Doc,
+  type Point,
+  type Rect,
+} from '@/editor/document';
+import { commit, init, redo, undo, type History } from '@/editor/history';
+import { PALETTE, strokeWidth } from '@/editor/style';
 import { commands } from '@/lib/ipc';
 import { t } from '@/i18n';
-import { Canvas } from './Canvas';
+import { Canvas, type CanvasPointer } from './Canvas';
+import { ContextBubble } from './ContextBubble';
+import { keyAction, type EditorAction } from './keys';
 import { StatusBar } from './StatusBar';
 import { TopBar, type Style } from './TopBar';
+import { AnnotationNode } from './tools/AnnotationNode';
 import type { ToolId } from './tools/catalog';
+import { begin, DRAG_TOOLS, extend, finish } from './tools/create';
+import { CropShade, SelectionUi } from './tools/SelectionUi';
+import { TextEditor } from './tools/TextEditor';
 import { useEditorSession } from './useEditorSession';
 import { fit, zoomAt, type View } from './viewport';
 
 const DEFAULT_STYLE: Style = { color: PALETTE[0], size: 2, fill: false, shadow: true };
+type TextAnnotation = Extract<Annotation, { tool: 'text' }>;
+
+function cropBox(a: Point, b: Point): Rect {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    width: Math.abs(b.x - a.x),
+    height: Math.abs(b.y - a.y),
+  };
+}
+
+/** The style choice applied to an existing annotation (spec J2 § 4.1). */
+function restyle(
+  a: Annotation,
+  style: Partial<Style>,
+  image: { w: number; h: number },
+): Annotation {
+  const width = style.size ? strokeWidth(image, style.size) : undefined;
+  switch (a.tool) {
+    case 'arrow':
+    case 'line':
+    case 'pen':
+      return {
+        ...a,
+        stroke: {
+          ...a.stroke,
+          color: style.color ?? a.stroke.color,
+          width: width ?? a.stroke.width,
+        },
+        ...(a.tool === 'arrow' && style.shadow !== undefined ? { shadow: style.shadow } : {}),
+      };
+    case 'rect':
+    case 'ellipse':
+      return {
+        ...a,
+        stroke: {
+          ...a.stroke,
+          color: style.color ?? a.stroke.color,
+          width: width ?? a.stroke.width,
+        },
+        fill:
+          style.fill === undefined && !style.color
+            ? a.fill
+            : {
+                kind: (style.fill ?? a.fill.kind !== 'none') ? 'translucent' : 'none',
+                color: style.color ?? a.fill.color,
+              },
+        shadow: style.shadow ?? a.shadow,
+      };
+    case 'highlighter':
+      return { ...a, color: style.color ?? a.color, width: width ? width * 4 : a.width };
+    case 'text':
+      return { ...a, color: style.color ?? a.color, size: width ? width * 6 : a.size };
+    case 'step':
+      return { ...a, color: style.color ?? a.color, size: width ?? a.size };
+    case 'pixelate':
+      return a;
+  }
+}
 
 /** The annotation editor (spec J2 § 4). */
 export function Editor() {
   const loaded = useEditorSession();
-  const stageRef = useRef<Konva.Stage>(null);
+  // The stage as state: the bubble and the transformer read its nodes while rendering.
+  const [stage, setStage] = useState<Konva.Stage | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const [history, setHistory] = useState<History | null>(null);
@@ -26,6 +106,13 @@ export function Editor() {
   const [style, setStyle] = useState<Style>(DEFAULT_STYLE);
   const [panning, setPanning] = useState(false);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [draft, setDraft] = useState<Annotation | null>(null);
+  const [cropDraft, setCropDraft] = useState<Rect | null>(null);
+  const [editing, setEditing] = useState<TextAnnotation | null>(null);
+  const anchor = useRef<Point | null>(null);
+  // The document before a handle drag: the whole drag is one undo step.
+  const dragBase = useRef<Doc | null>(null);
 
   // A new capture: fresh document and fitted view, set while rendering (React's pattern for
   // state that follows a prop), once the box has a size.
@@ -35,6 +122,10 @@ export function Editor() {
     setShownId(captureId);
     setHistory(init(newDoc(captureId, width, height)));
     setMessage(null);
+    setSelected([]);
+    setDraft(null);
+    setCropDraft(null);
+    setEditing(null);
     setView(fit({ w: width, h: height }, box));
   }
 
@@ -49,33 +140,115 @@ export function Editor() {
   }, []);
 
   const doc = history?.present ?? null;
+  const image = doc ? doc.size : { w: 1, h: 1 };
+  const record = (next: Doc) => setHistory((h) => h && commit(h, next));
   const fitView = () => {
     if (doc) setView(fit({ w: doc.size.w, h: doc.size.h }, box));
   };
   const zoomBy = (factor: number) =>
     setView((v) => zoomAt(v, factor, { x: box.width / 2, y: box.height / 2 }));
+  const notYet = () => setMessage({ text: t('editor.soon'), error: false });
+
+  const changeTool = (next: ToolId) => {
+    setTool(next);
+    setDraft(null);
+    if (next !== 'select') setSelected([]);
+    if (next === 'crop' && doc)
+      setCropDraft(doc.crop ?? { x: 0, y: 0, width: doc.size.w, height: doc.size.h });
+    else setCropDraft(null);
+  };
+
+  const applyStyle = (patch: Partial<Style>) => {
+    setStyle((s) => ({ ...s, ...patch }));
+    if (!doc || selected.length === 0) return;
+    let next = doc;
+    for (const a of doc.annotations.filter((x) => selected.includes(x.id)))
+      next = update(next, a.id, restyle(a, patch, doc.size));
+    record(next);
+  };
+
+  const changeSelected = (patch: (a: Annotation) => Partial<Annotation>) => {
+    if (!doc) return;
+    let next = doc;
+    for (const a of doc.annotations.filter((x) => selected.includes(x.id)))
+      next = update(next, a.id, patch(a));
+    record(next);
+  };
+
+  const act = (action: EditorAction) => {
+    if (!doc) return;
+    switch (action.type) {
+      case 'tool':
+        return changeTool(action.tool);
+      case 'size':
+        return applyStyle({ size: action.step });
+      case 'undo':
+        return setHistory((h) => h && undo(h));
+      case 'redo':
+        return setHistory((h) => h && redo(h));
+      case 'selectAll':
+        setTool('select');
+        return setSelected(doc.annotations.map((a) => a.id));
+      case 'duplicate': {
+        if (selected.length === 0) return;
+        const copy = duplicate(doc, selected, { x: 12, y: 12 });
+        record(copy.doc);
+        return setSelected(copy.ids);
+      }
+      case 'delete':
+        if (selected.length === 0) return;
+        record(remove(doc, selected));
+        return setSelected([]);
+      case 'nudge': {
+        if (selected.length === 0) return;
+        let next = doc;
+        for (const a of doc.annotations.filter((x) => selected.includes(x.id)))
+          next = update(next, a.id, translate(a, { x: action.dx, y: action.dy }));
+        return record(next);
+      }
+      case 'escape':
+        if (cropDraft) return changeTool('select');
+        if (selected.length > 0) return setSelected([]);
+        return void commands.editorClose();
+      case 'copy':
+      case 'save':
+      case 'saveAs':
+      case 'copyAndClose':
+        return notYet();
+    }
+  };
 
   const keysRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useLayoutEffect(() => {
     keysRef.current = (e: KeyboardEvent) => {
+      if (editing) return;
       if (e.key === ' ' && !e.repeat) {
         setPanning(true);
         e.preventDefault();
         return;
       }
       if (e.ctrlKey && e.key === '0') return (e.preventDefault(), fitView());
-      if (e.ctrlKey && e.key === '1')
-        return (
-          e.preventDefault(),
-          setView((v) => zoomAt(v, 1 / v.scale, { x: box.width / 2, y: box.height / 2 }))
-        );
+      if (e.ctrlKey && e.key === '1') {
+        e.preventDefault();
+        return setView((v) => zoomAt(v, 1 / v.scale, { x: box.width / 2, y: box.height / 2 }));
+      }
       if (e.ctrlKey && (e.key === '+' || e.key === '=')) return (e.preventDefault(), zoomBy(1.25));
       if (e.ctrlKey && e.key === '-') return (e.preventDefault(), zoomBy(0.8));
-      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z')
-        return (e.preventDefault(), setHistory((h) => h && undo(h)));
-      if (e.ctrlKey && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z')))
-        return (e.preventDefault(), setHistory((h) => h && redo(h)));
-      if (e.key === 'Escape') void commands.editorClose();
+      if (cropDraft && e.key === 'Enter' && doc) {
+        e.preventDefault();
+        record(setCrop(doc, cropDraft.width > 2 && cropDraft.height > 2 ? cropDraft : null));
+        return changeTool('select');
+      }
+      const action = keyAction({
+        key: e.key,
+        ctrl: e.ctrlKey,
+        shift: e.shiftKey,
+        alt: e.altKey,
+        editingText: false,
+      });
+      if (!action) return;
+      e.preventDefault();
+      act(action);
     };
   });
   useEffect(() => {
@@ -91,7 +264,98 @@ export function Editor() {
     };
   }, []);
 
-  const notYet = () => setMessage({ text: t('editor.soon'), error: false });
+  const onDown = (p: CanvasPointer) => {
+    if (!doc) return;
+    if (tool === 'select') {
+      if (p.target === p.target.getStage()) setSelected([]);
+      return;
+    }
+    if (tool === 'text') {
+      const size = strokeWidth(doc.size, style.size) * 6;
+      setEditing({
+        id: newId(),
+        tool: 'text',
+        at: p.at,
+        text: '',
+        size,
+        color: style.color,
+        style: 'plain',
+      });
+      return;
+    }
+    if (tool === 'step') {
+      record(
+        add(doc, {
+          id: newId(),
+          tool: 'step',
+          at: p.at,
+          color: style.color,
+          size: strokeWidth(doc.size, style.size),
+        }),
+      );
+      return;
+    }
+    anchor.current = p.at;
+    if (tool === 'crop') return setCropDraft({ ...p.at, width: 0, height: 0 });
+    if (DRAG_TOOLS.includes(tool)) setDraft(begin(tool, p.at, style, doc.size));
+  };
+
+  const onMove = (p: CanvasPointer) => {
+    const from = anchor.current;
+    if (!from) return;
+    if (tool === 'crop') return setCropDraft(cropBox(from, p.at));
+    setDraft((d) => d && extend(d, from, p.at, p));
+  };
+
+  const onUp = () => {
+    anchor.current = null;
+    if (!doc || !draft) return;
+    const done = finish(draft);
+    setDraft(null);
+    if (done) record(add(doc, done));
+  };
+
+  const finishText = (a: TextAnnotation, text: string) => {
+    setEditing(null);
+    if (!doc) return;
+    const exists = doc.annotations.some((x) => x.id === a.id);
+    const trimmed = text.replace(/\s+$/, '');
+    if (!trimmed) return exists && record(remove(doc, [a.id]));
+    record(exists ? update(doc, a.id, { text: trimmed }) : add(doc, { ...a, text: trimmed }));
+  };
+
+  const onHandle = (id: string, patch: Partial<Annotation>, final: boolean) => {
+    setHistory((h) => {
+      if (!h) return h;
+      const base = dragBase.current ?? h.present;
+      const next = update(h.present, id, patch);
+      if (!final) {
+        dragBase.current = base;
+        return { ...h, present: next };
+      }
+      dragBase.current = null;
+      return { past: [...h.past, base].slice(-200), present: next, future: [] };
+    });
+  };
+
+  const selectedAnnotations = doc ? doc.annotations.filter((a) => selected.includes(a.id)) : [];
+  // The bubble sits under the selection, in the canvas area's CSS pixels.
+  let bubbleAt: { x: number; y: number } | null = null;
+  if (tool === 'select' && selectedAnnotations.length > 0 && stage) {
+    const rects = selected
+      .map((id) => stage?.findOne(`#${id}`)?.getClientRect())
+      .filter((r): r is NonNullable<typeof r> => Boolean(r));
+    if (rects.length > 0) {
+      const left = Math.min(...rects.map((r) => r.x));
+      const right = Math.max(...rects.map((r) => r.x + r.width));
+      const bottom = Math.max(...rects.map((r) => r.y + r.height));
+      const top = Math.min(...rects.map((r) => r.y));
+      const below = bottom + 12 + 40 < box.height;
+      bubbleAt = { x: (left + right) / 2, y: below ? bottom + 12 : Math.max(8, top - 52) };
+    }
+  }
+
+  const cursor = tool === 'select' ? 'default' : tool === 'text' ? 'text' : 'crosshair';
 
   return (
     <div
@@ -104,8 +368,8 @@ export function Editor() {
         canUndo={(history?.past.length ?? 0) > 0}
         canRedo={(history?.future.length ?? 0) > 0}
         busy={!doc}
-        onTool={setTool}
-        onStyle={(patch) => setStyle((s) => ({ ...s, ...patch }))}
+        onTool={changeTool}
+        onStyle={applyStyle}
         onUndo={() => setHistory((h) => h && undo(h))}
         onRedo={() => setHistory((h) => h && redo(h))}
         onCopy={notYet}
@@ -119,26 +383,105 @@ export function Editor() {
       >
         {loaded && doc && box.width > 0 && (
           <Canvas
-            ref={stageRef}
+            ref={setStage}
             bitmap={loaded.bitmap}
             view={view}
             size={box}
             panning={panning}
-            cursor="crosshair"
+            cursor={cursor}
             onView={setView}
-            onDown={() => {}}
-            onMove={() => {}}
-            onUp={() => {}}
+            onDown={onDown}
+            onMove={onMove}
+            onUp={onUp}
             onDoubleClick={() => {}}
-            annotations={null}
-            draft={null}
-            overlay={null}
+            annotations={doc.annotations.map((a) => (
+              <AnnotationNode
+                key={a.id}
+                a={a}
+                doc={doc}
+                pixels={loaded.pixels}
+                events={{
+                  draggable: tool === 'select',
+                  onSelect: (id, more) =>
+                    setSelected((s) =>
+                      more
+                        ? s.includes(id)
+                          ? s.filter((x) => x !== id)
+                          : [...s, id]
+                        : s.includes(id)
+                          ? s
+                          : [id],
+                    ),
+                  onMoved: (id, dx, dy, copy) => {
+                    const ids = selected.includes(id) ? selected : [id];
+                    let next = copy ? duplicate(doc, ids, { x: 0, y: 0 }).doc : doc;
+                    for (const x of doc.annotations.filter((y) => ids.includes(y.id)))
+                      next = update(next, x.id, translate(x, { x: dx, y: dy }));
+                    record(next);
+                  },
+                  onEditText: (id) => {
+                    const a = doc.annotations.find((x) => x.id === id);
+                    if (a?.tool === 'text') setEditing(a);
+                  },
+                }}
+              />
+            ))}
+            draft={
+              draft && (
+                <AnnotationNode
+                  a={draft}
+                  doc={doc}
+                  pixels={loaded.pixels}
+                  events={{
+                    draggable: false,
+                    onSelect: () => {},
+                    onMoved: () => {},
+                    onEditText: () => {},
+                  }}
+                />
+              )
+            }
+            overlay={
+              <>
+                {tool === 'select' && (
+                  <SelectionUi
+                    selected={selectedAnnotations}
+                    stage={stage}
+                    scale={view.scale}
+                    onChange={onHandle}
+                  />
+                )}
+                {cropDraft && <CropShade crop={cropDraft} image={image} />}
+                {!cropDraft && doc.crop && <CropShade crop={doc.crop} image={image} />}
+              </>
+            }
+          />
+        )}
+        {editing && (
+          <TextEditor a={editing} view={view} onDone={(text) => finishText(editing, text)} />
+        )}
+        {bubbleAt && (
+          <ContextBubble
+            selected={selectedAnnotations}
+            at={bubbleAt}
+            onDash={(dash) =>
+              changeSelected((a) => ('stroke' in a ? { stroke: { ...a.stroke, dash } } : {}))
+            }
+            onOpacity={(opacity) =>
+              changeSelected((a) => ('stroke' in a ? { stroke: { ...a.stroke, opacity } } : {}))
+            }
+            onTextStyle={(s) => changeSelected((a) => (a.tool === 'text' ? { style: s } : {}))}
+            onFront={() => doc && record(selected.reduce((d, id) => reorder(d, id, 'front'), doc))}
+            onBack={() =>
+              doc && record([...selected].reverse().reduce((d, id) => reorder(d, id, 'back'), doc))
+            }
+            onDelete={() => act({ type: 'delete' })}
           />
         )}
       </div>
       <StatusBar
-        width={doc?.size.w ?? 0}
-        height={doc?.size.h ?? 0}
+        width={doc?.crop?.width ?? doc?.size.w ?? 0}
+        height={doc?.crop?.height ?? doc?.size.h ?? 0}
         annotations={doc?.annotations.length ?? 0}
         zoom={view.scale}
         message={message}
