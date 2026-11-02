@@ -4,13 +4,13 @@ use tauri::Manager;
 use tauri_specta::{Builder, Event, collect_commands, collect_events};
 
 use crate::capture::types::{CommitTarget, MonitorInfo, WindowInfo};
+use crate::editor::{self, EditorSession};
 use crate::error::{ErrorCode, KResult, KirishotError};
 use crate::flow::{self, OverlayClaimed, OverlayReset, OverlaySession};
 use crate::geometry::{Point, Rect};
 use crate::paths;
 use crate::settings::model::{SettingsPatch, apply_patch};
 use crate::settings::{self, SettingsChanged, SettingsState, SettingsView};
-use crate::shots::ShotStore;
 use crate::thumbnails::{self, ThumbState, ThumbnailPushed, ThumbnailUpdate};
 use crate::windowing;
 
@@ -112,14 +112,14 @@ pub async fn thumbnail_save(app: tauri::AppHandle, id: String) -> KResult<()> {
 #[tauri::command]
 #[specta::specta]
 pub async fn thumbnail_edit(app: tauri::AppHandle, id: String) -> KResult<()> {
-    if !app.state::<ShotStore>().begin_edit(&id) {
-        return Err(KirishotError::new(
-            ErrorCode::NoActiveCapture,
-            "Capture introuvable",
-        ));
-    }
-    log::info!("editor requested for {id} (J2 task 12)");
-    Ok(())
+    let (tx, rx) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(editor::open(&handle, &id));
+    })
+    .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?;
+    rx.recv()
+        .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?
 }
 
 #[tauri::command]
@@ -153,6 +153,21 @@ pub async fn thumbnail_reveal(app: tauri::AppHandle, id: String) -> KResult<()> 
 pub async fn thumbnail_copy_path(app: tauri::AppHandle, id: String) -> KResult<()> {
     let path = thumbnails::saved_path(&app, &id)?;
     crate::output::clipboard::write_text(&path.to_string_lossy())
+}
+
+/// The editor page listens for frames: a pending capture can be posted.
+#[tauri::command]
+#[specta::specta]
+pub async fn editor_loaded(window: tauri::WebviewWindow) -> KResult<()> {
+    editor::mark_loaded(&window)
+}
+
+/// Closes the editor and frees its capture.
+#[tauri::command]
+#[specta::specta]
+pub async fn editor_close(app: tauri::AppHandle) -> KResult<()> {
+    editor::close(&app);
+    Ok(())
 }
 
 /// Copies text, such as the colour under the magnifier.
@@ -262,7 +277,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             thumbnail_close,
             thumbnail_delete,
             thumbnail_reveal,
-            thumbnail_copy_path
+            thumbnail_copy_path,
+            editor_loaded,
+            editor_close
         ])
         .events(collect_events![
             SettingsChanged,
@@ -279,6 +296,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
         .typ::<CommitTarget>()
         // Sent as the shared buffer's additionalData, never as a command result.
         .typ::<OverlaySession>()
+        .typ::<EditorSession>()
 }
 
 /// Writes `src/lib/bindings.ts`, which the front end imports through `src/lib/ipc.ts`.

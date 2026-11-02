@@ -132,6 +132,22 @@ pub fn route(s: &crate::settings::model::Settings, thumbnails_alive: bool) -> Ro
     }
 }
 
+/// « Toujours ouvrir l'éditeur »: no thumbnail and no automatic action.
+fn open_in_editor(app: &tauri::AppHandle, img: image::RgbaImage, meta: CaptureMeta) -> KResult<()> {
+    let action = app.state::<SettingsState>().get().after_capture.auto_action;
+    let id = app
+        .state::<crate::shots::ShotStore>()
+        .insert(img, meta, action);
+    let (tx, rx) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(crate::editor::open(&handle, &id));
+    })
+    .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?;
+    rx.recv()
+        .map_err(|e| KirishotError::new(ErrorCode::Window, e.to_string()))?
+}
+
 /// What follows a capture: the thumbnail, the editor, or the J1 immediate action. A copy-only
 /// capture (Ctrl+C in the selection) is copied at once, with no file and no thumbnail.
 fn after_capture(
@@ -151,14 +167,14 @@ fn after_capture(
     let alive = app.state::<crate::thumbnails::ThumbState>().alive(app);
     let pushed = match route(&settings, alive) {
         Route::Immediate => None,
-        // The editor arrives in J2 task 12; until then the thumbnail stands in for it.
-        Route::Thumbnail | Route::Editor if alive => Some(crate::thumbnails::push(
+        Route::Thumbnail if alive => Some(crate::thumbnails::push(
             app,
             img.clone(),
             meta.clone(),
             monitor,
         )),
-        Route::Thumbnail | Route::Editor => None,
+        Route::Editor => Some(open_in_editor(app, img.clone(), meta.clone())),
+        Route::Thumbnail => None,
     };
     match pushed {
         Some(Ok(())) => {}

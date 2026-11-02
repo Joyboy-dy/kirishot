@@ -1,5 +1,6 @@
 mod capture;
 mod commands;
+mod editor;
 mod error;
 mod flow;
 mod frame;
@@ -42,6 +43,7 @@ pub fn run() {
         .manage(store::CaptureStore::default())
         .manage(shots::ShotStore::default())
         .manage(thumbnails::ThumbState::default())
+        .manage(editor::EditorState::default())
         .manage(flow::FlowState::default())
         .manage(windowing::OverlaySet::default())
         .invoke_handler(builder.invoke_handler())
@@ -77,6 +79,9 @@ pub fn run() {
                 Err(e) => log::error!("cannot list monitors: {e}"),
             }
             if let Err(e) = thumbnails::window::create(app.handle()) {
+                log::error!("{e}");
+            }
+            if let Err(e) = editor::create(app.handle()) {
                 log::error!("{e}");
             }
             hotkeys::register_all(app.handle(), &shortcuts);

@@ -28,6 +28,8 @@ fn main() {
                 "thumbnail_delete",
                 "thumbnail_reveal",
                 "thumbnail_copy_path",
+                "editor_loaded",
+                "editor_close",
             ])),
     )
     .expect("failed to run tauri-build");

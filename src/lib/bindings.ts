@@ -36,6 +36,10 @@ export const commands = {
 	/**  « Ouvrir le dossier »: the Explorer with the saved file selected. */
 	thumbnailReveal: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnail_reveal", { id })),
 	thumbnailCopyPath: (id: string) => typedError<null, KirishotError>(__TAURI_INVOKE("thumbnail_copy_path", { id })),
+	/**  The editor page listens for frames: a pending capture can be posted. */
+	editorLoaded: () => typedError<null, KirishotError>(__TAURI_INVOKE("editor_loaded")),
+	/**  Closes the editor and frees its capture. */
+	editorClose: () => typedError<null, KirishotError>(__TAURI_INVOKE("editor_close")),
 };
 
 /** Events */
@@ -75,6 +79,14 @@ export type CaptureSettings = {
 
 /**  What the selection overlay asks Rust to capture. */
 export type CommitTarget = { kind: "region"; rect: Rect } | { kind: "window"; index: number } | { kind: "monitor" };
+
+/**  What the editor page needs besides the pixels; sent as the shared buffer's additionalData. */
+export type EditorSession = {
+	captureId: string,
+	width: number,
+	height: number,
+	title: string,
+};
 
 /**  Stable error codes shared with the front end, which translates them. */
 export type ErrorCode = "capture" | "noActiveCapture" | "invalidSelection" | "encode" | "save" | "clipboard" | "settings" | "shortcut" | "window" | "internal";
