@@ -81,6 +81,18 @@ function dragRect(anchor: Point, at: Point, square: boolean, fromCentre: boolean
   };
 }
 
+/** What a key does to the shortcut sheet: `?` opens or closes it, Échap only closes it. */
+export function sheetKey(key: string, open: boolean): 'toggle' | 'close' | null {
+  if (key === '?') return 'toggle';
+  if (key === 'Escape' && open) return 'close';
+  return null;
+}
+
+/** A window title cut to `max` characters, ellipsis included. */
+export function truncateTitle(title: string, max = 60): string {
+  return title.length <= max ? title : `${title.slice(0, max - 1)}…`;
+}
+
 export function step(s: SelState, e: SelEvent, ctx: Ctx): Result {
   if (e.type === 'reset') return stay(initialState);
   if (e.type === 'key' && e.key === 'Escape')
@@ -92,9 +104,13 @@ export function step(s: SelState, e: SelEvent, ctx: Ctx): Result {
 
   switch (s.kind) {
     case 'idle':
+      // Zone mode only draws: windows are highlighted in window mode alone (spec J2.1 § 2.1).
       if (e.type === 'pointerMove')
-        return stay({ kind: 'idle', hover: windowAt(ctx.windows, e.at) });
-      if (e.type === 'pointerDown' && ctx.mode === 'region') return startDrag(e.at, s.hover);
+        return stay({
+          kind: 'idle',
+          hover: ctx.mode === 'window' ? windowAt(ctx.windows, e.at) : null,
+        });
+      if (e.type === 'pointerDown' && ctx.mode === 'region') return startDrag(e.at, null);
       // Window mode commits on a full click on the overlay: a release alone (a toolbar
       // button stops its pointerdown) must not capture the window behind the toolbar.
       if (e.type === 'pointerDown') return stay({ kind: 'pressed', hover: s.hover });
@@ -126,9 +142,7 @@ export function step(s: SelState, e: SelEvent, ctx: Ctx): Result {
         return stay({ ...s, last: e.at, rect });
       }
       if (e.type === 'pointerUp') {
-        if (isTooSmall(s.rect)) {
-          return s.hover ? commit({ kind: 'window', index: s.hover.index }) : stay(initialState);
-        }
+        if (isTooSmall(s.rect)) return stay(initialState);
         return ctx.commitOnRelease ? region(s.rect) : stay({ kind: 'adjusting', rect: s.rect });
       }
       return stay(s);

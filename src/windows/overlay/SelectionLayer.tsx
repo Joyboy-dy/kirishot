@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { physicalToCss, type Handle } from '@/lib/geometry';
 import type { Rect, WindowInfo } from '@/lib/ipc';
 import { t } from '@/i18n';
-import { cursorFor } from './selection';
+import { cursorFor, truncateTitle } from './selection';
 
 const DIM = 'rgba(4, 5, 10, 0.58)';
 const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -80,7 +80,7 @@ export function SelectionLayer({ scale, rect, hover, withHandles }: Props) {
         hover && (
           <span style={{ ...chip, ...chipPosition(r) }}>
             {t('overlay.windowLabel', {
-              title: hover.title,
+              title: truncateTitle(hover.title),
               w: hover.bounds.width,
               h: hover.bounds.height,
             })}

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { AppWindow, Monitor, Search, SquareDashed, X } from 'lucide-react';
+import { AppWindow, CircleHelp, Monitor, Search, SquareDashed, X } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { Tip } from '@/components/ui/Tip';
 import { t } from '@/i18n';
@@ -7,10 +7,12 @@ import type { Mode } from './selection';
 
 type Props = {
   mode: Mode;
+  position: 'top' | 'bottom';
   magnifier: boolean;
   onMode(mode: Mode): void;
   onFullscreen(): void;
   onMagnifier(on: boolean): void;
+  onHelp(): void;
   onCancel(): void;
 };
 
@@ -43,8 +45,17 @@ function ToolButton(props: {
   );
 }
 
-/** Capture modes, shown at the top of the monitor under the pointer only. */
-export function Toolbar({ mode, magnifier, onMode, onFullscreen, onMagnifier, onCancel }: Props) {
+/** Capture modes, shown at the top (or bottom) of the monitor under the pointer only. */
+export function Toolbar({
+  mode,
+  position,
+  magnifier,
+  onMode,
+  onFullscreen,
+  onMagnifier,
+  onHelp,
+  onCancel,
+}: Props) {
   // Clicks on the bar must never reach the selection underneath (J1 final review).
   const stop = (e: { stopPropagation(): void }) => e.stopPropagation();
   return (
@@ -55,7 +66,7 @@ export function Toolbar({ mode, magnifier, onMode, onFullscreen, onMagnifier, on
       onPointerDown={stop}
       onPointerUp={stop}
       onDoubleClick={stop}
-      className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-1 rounded-xl p-1.5"
+      className={`absolute left-1/2 ${position === 'bottom' ? 'bottom-4' : 'top-4'} flex -translate-x-1/2 items-center gap-1 rounded-xl p-1.5`}
       style={{
         background: 'var(--k-glass)',
         backdropFilter: 'blur(16px)',
@@ -99,6 +110,9 @@ export function Toolbar({ mode, magnifier, onMode, onFullscreen, onMagnifier, on
         onClick={() => onMagnifier(!magnifier)}
       >
         <Search size={16} strokeWidth={1.9} />
+      </ToolButton>
+      <ToolButton label={t('overlay.help')} keys={['?']} iconOnly onClick={onHelp}>
+        <CircleHelp size={16} strokeWidth={1.9} />
       </ToolButton>
       <ToolButton label={t('overlay.cancel')} keys={['Échap']} onClick={onCancel}>
         <X size={16} strokeWidth={1.9} />

@@ -4,7 +4,9 @@ import type { Rect, WindowInfo } from '@/lib/ipc';
 import {
   cursorFor,
   initialState,
+  sheetKey,
   step,
+  truncateTitle,
   type Ctx,
   type Outcome,
   type SelEvent,
@@ -55,8 +57,15 @@ const adjusting = (rect: Rect): SelState => ({ kind: 'adjusting', rect });
 const ZONE = { x: 324, y: 266, width: 604, height: 280 };
 
 describe('selection', () => {
-  it('hovering a window highlights it', () => {
-    expect(run([move(1000, 200)]).state).toEqual({ kind: 'idle', hover: W });
+  it('zone mode never highlights a window', () => {
+    expect(run([move(1000, 200)]).state).toEqual({ kind: 'idle', hover: null });
+  });
+
+  it('window mode highlights the hovered window', () => {
+    expect(run([move(1000, 200)], { ...ctx, mode: 'window' }).state).toEqual({
+      kind: 'idle',
+      hover: W,
+    });
   });
 
   it('drag then release enters adjusting and claims first', () => {
@@ -73,9 +82,32 @@ describe('selection', () => {
     expect(r.outcomes.at(-1)).toEqual({ type: 'commit', target: { kind: 'region', rect: ZONE } });
   });
 
-  it('a click on a hovered window commits that window', () => {
+  it('zone mode ignores a click without drag', () => {
     const r = run([move(1000, 200), down(1000, 200), up(1001, 201)]);
+    expect(r.state).toEqual(initialState);
+    expect(r.outcomes.at(-1)).toEqual({ type: 'none' });
+  });
+
+  it('window mode does not draw and captures the window under the release', () => {
+    const r = run([move(1000, 200), down(1000, 200), move(1200, 400), up(1200, 400)], {
+      ...ctx,
+      mode: 'window',
+    });
     expect(r.outcomes.at(-1)).toEqual({ type: 'commit', target: { kind: 'window', index: 0 } });
+  });
+
+  it('sheetKey toggles with ? and closes with Escape', () => {
+    expect(sheetKey('?', false)).toBe('toggle');
+    expect(sheetKey('?', true)).toBe('toggle');
+    expect(sheetKey('Escape', true)).toBe('close');
+    expect(sheetKey('Escape', false)).toBeNull();
+    expect(sheetKey('r', true)).toBeNull();
+  });
+
+  it('truncateTitle keeps 60 characters', () => {
+    const sixty = 'a'.repeat(60);
+    expect(truncateTitle(sixty)).toBe(sixty);
+    expect(truncateTitle('a'.repeat(61))).toBe('a'.repeat(59) + '…');
   });
 
   it('a click on empty space commits nothing', () => {

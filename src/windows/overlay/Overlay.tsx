@@ -13,14 +13,15 @@ import { NO_CHANGE } from '@/lib/settings';
 import { t } from '@/i18n';
 import { commands, type CommitTarget, type OverlaySession, type Rect } from '@/lib/ipc';
 import { flashPlan, flashRect, FLASH_MS } from './flash';
-import { KeyHints } from './KeyHints';
 import { Magnifier } from './Magnifier';
 import { SelectionLayer } from './SelectionLayer';
+import { ShortcutSheet } from './ShortcutSheet';
 import { Toolbar } from './Toolbar';
 import { useOverlaySession } from './useOverlaySession';
 import {
   cursorFor,
   initialState,
+  sheetKey,
   step,
   type Ctx,
   type Mode,
@@ -64,6 +65,12 @@ export function Overlay() {
   const [flash, setFlash] = useState<Rect | null>(null);
   const [space, setSpace] = useState(false);
   const spaceRef = useRef(false);
+  const [sheet, setSheet] = useState(false);
+  const sheetRef = useRef(false);
+  const showSheet = (open: boolean) => {
+    sheetRef.current = open;
+    setSheet(open);
+  };
 
   const setSelection = (next: SelState) => {
     selRef.current = next;
@@ -73,7 +80,8 @@ export function Overlay() {
   const { session, frame } = useOverlaySession(canvasRef, {
     onSession: (s) => {
       setSelection(initialState);
-      setMode('region');
+      setMode(s.mode);
+      showSheet(false);
       setMagnifier(s.magnifier);
       setActive(s.cursor !== null);
       setPointer(s.cursor);
@@ -104,7 +112,7 @@ export function Overlay() {
     if (outcome.type === 'claim') report(commands.overlayClaim());
     if (outcome.type === 'cancel') report(commands.overlayCancel());
     if (outcome.type === 'commit') commitWithFlash(s, outcome.target, outcome.copyOnly ?? false);
-    if (outcome.type === 'mode') setMode(outcome.mode);
+    if (outcome.type === 'mode') rememberMode(outcome.mode);
     if (outcome.type === 'fullscreen') commitWithFlash(s, { kind: 'monitor' }, false);
   };
 
@@ -119,6 +127,12 @@ export function Overlay() {
       setFlash(null);
       send();
     }, duration);
+  };
+
+  // The next capture starts in the mode chosen last (spec J2.1 § 2.1).
+  const rememberMode = (next: Mode) => {
+    setMode(next);
+    report(commands.settingsUpdate({ ...NO_CHANGE, mode: next }));
   };
 
   const toggleMagnifier = (on: boolean) => {
@@ -160,6 +174,14 @@ export function Overlay() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // The shortcut sheet takes ? and Échap first; while it is open, other keys do nothing.
+      const sheetAction = sheetKey(e.key, sheetRef.current);
+      if (sheetAction) {
+        e.preventDefault();
+        showSheet(sheetAction === 'toggle' ? !sheetRef.current : false);
+        return;
+      }
+      if (sheetRef.current) return;
       const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       if (k === ' ') {
         spaceRef.current = true;
@@ -215,7 +237,7 @@ export function Overlay() {
 
   const commit = (target: CommitTarget) => act({ type: 'commit', target });
   const changeMode = (next: Mode) => {
-    setMode(next);
+    rememberMode(next);
     setSelection(initialState);
   };
 
@@ -311,14 +333,16 @@ export function Overlay() {
           {active && (
             <Toolbar
               mode={mode}
+              position={session.toolbarPosition}
               magnifier={magnifier}
+              onHelp={() => showSheet(!sheetRef.current)}
               onMagnifier={toggleMagnifier}
               onMode={changeMode}
               onFullscreen={() => commit({ kind: 'monitor' })}
               onCancel={() => act({ type: 'cancel' })}
             />
           )}
-          {active && <KeyHints />}
+          {sheet && <ShortcutSheet onClose={() => showSheet(false)} />}
         </>
       )}
     </div>
