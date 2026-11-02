@@ -13,7 +13,17 @@ pub struct Settings {
     pub shortcuts: Shortcuts,
     pub history: HistorySettings,
     pub system: SystemSettings,
+    pub editor: EditorSettings,
     pub onboarding_done: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorSettings {
+    /// The last custom colours, newest first, `#RRGGBB`, 8 at most.
+    pub recent_colors: Vec<String>,
+    /// Ask before closing a capture with unsaved changes (spec J3 § 3.5).
+    pub confirm_close: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, specta::Type)]
@@ -50,6 +60,17 @@ pub struct CaptureSettings {
     /// The selection mode the next capture starts in (the last one chosen).
     pub mode: CaptureMode,
     pub toolbar_position: ToolbarPosition,
+    /// The mode a capture starts in (spec J3 § 2.3).
+    pub start_mode: StartModeSetting,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum StartModeSetting {
+    Region,
+    Window,
+    /// The mode chosen last (`capture.mode`).
+    Last,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
@@ -162,6 +183,7 @@ impl Default for Settings {
                 commit_on_release: false,
                 mode: CaptureMode::Region,
                 toolbar_position: ToolbarPosition::Top,
+                start_mode: StartModeSetting::Region,
             },
             shortcuts: Shortcuts {
                 region: Some("Super+Shift+S".into()),
@@ -179,6 +201,10 @@ impl Default for Settings {
                 language: Language::Auto,
                 theme: Theme::System,
                 check_updates: true,
+            },
+            editor: EditorSettings {
+                recent_colors: Vec::new(),
+                confirm_close: true,
             },
             onboarding_done: false,
         }
@@ -211,6 +237,21 @@ pub struct SettingsPatch {
     pub mode: Option<CaptureMode>,
     pub toolbar_position: Option<ToolbarPosition>,
     pub launch_at_startup: Option<bool>,
+    pub start_mode: Option<StartModeSetting>,
+    pub theme: Option<Theme>,
+    pub include_cursor: Option<bool>,
+    pub name_template: Option<String>,
+    pub retention: Option<Retention>,
+    pub recent_colors: Option<Vec<String>>,
+    pub confirm_close: Option<bool>,
+}
+
+/// How long the history keeps captures; a patch cannot carry `null` to mean "forever".
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, specta::Type)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum Retention {
+    Days { value: u32 },
+    Forever,
 }
 
 /// How long a thumbnail stays; a patch cannot carry `null` to mean "until closed".
@@ -239,6 +280,13 @@ impl SettingsPatch {
             mode: None,
             toolbar_position: None,
             launch_at_startup: None,
+            start_mode: None,
+            theme: None,
+            include_cursor: None,
+            name_template: None,
+            retention: None,
+            recent_colors: None,
+            confirm_close: None,
         }
     }
 }
@@ -289,6 +337,30 @@ pub fn apply_patch(s: &mut Settings, p: SettingsPatch) {
     if let Some(on) = p.launch_at_startup {
         s.system.launch_at_startup = on;
     }
+    if let Some(mode) = p.start_mode {
+        s.capture.start_mode = mode;
+    }
+    if let Some(theme) = p.theme {
+        s.system.theme = theme;
+    }
+    if let Some(on) = p.include_cursor {
+        s.capture.include_cursor = on;
+    }
+    if let Some(template) = p.name_template {
+        s.save.name_template = template;
+    }
+    if let Some(retention) = p.retention {
+        s.history.retention_days = match retention {
+            Retention::Days { value } => Some(value),
+            Retention::Forever => None,
+        };
+    }
+    if let Some(colors) = p.recent_colors {
+        s.editor.recent_colors = colors;
+    }
+    if let Some(on) = p.confirm_close {
+        s.editor.confirm_close = on;
+    }
 }
 
 #[cfg(test)]
@@ -310,13 +382,17 @@ mod tests {
         );
         assert_eq!(
             v["capture"],
-            json!({"magnifier": true, "sound": true, "flash": true, "includeCursor": false, "trayTimerSeconds": 3, "commitOnRelease": false, "mode": "region", "toolbarPosition": "top"})
+            json!({"magnifier": true, "sound": true, "flash": true, "includeCursor": false, "trayTimerSeconds": 3, "commitOnRelease": false, "mode": "region", "toolbarPosition": "top", "startMode": "region"})
         );
         assert_eq!(
             v["shortcuts"],
             json!({"region": "Super+Shift+S", "regionAlt": "PrintScreen", "fullscreen": "Shift+PrintScreen", "ocr": "Ctrl+PrintScreen", "repeatRegion": null, "openHistory": null})
         );
         assert_eq!(v["history"], json!({"retentionDays": 30}));
+        assert_eq!(
+            v["editor"],
+            json!({"recentColors": [], "confirmClose": true})
+        );
         assert_eq!(
             v["system"],
             json!({"launchAtStartup": true, "language": "auto", "theme": "system", "checkUpdates": true})
@@ -341,6 +417,39 @@ mod tests {
         expected.capture.mode = CaptureMode::Window;
         expected.capture.toolbar_position = ToolbarPosition::Bottom;
         assert_eq!(s, expected);
+    }
+
+    #[test]
+    fn patch_sets_j3_fields() {
+        let mut s = Settings::default();
+        apply_patch(
+            &mut s,
+            SettingsPatch {
+                start_mode: Some(StartModeSetting::Last),
+                theme: Some(Theme::Light),
+                include_cursor: Some(true),
+                name_template: Some("Shot {n}".into()),
+                retention: Some(Retention::Forever),
+                recent_colors: Some(vec!["#FF5B38".into()]),
+                confirm_close: Some(false),
+                ..SettingsPatch::empty()
+            },
+        );
+        assert_eq!(s.capture.start_mode, StartModeSetting::Last);
+        assert_eq!(s.system.theme, Theme::Light);
+        assert!(s.capture.include_cursor);
+        assert_eq!(s.save.name_template, "Shot {n}");
+        assert_eq!(s.history.retention_days, None);
+        assert_eq!(s.editor.recent_colors, vec!["#FF5B38".to_string()]);
+        assert!(!s.editor.confirm_close);
+        apply_patch(
+            &mut s,
+            SettingsPatch {
+                retention: Some(Retention::Days { value: 7 }),
+                ..SettingsPatch::empty()
+            },
+        );
+        assert_eq!(s.history.retention_days, Some(7));
     }
 
     #[test]

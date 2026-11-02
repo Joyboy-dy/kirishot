@@ -15,4 +15,11 @@ export const NO_CHANGE: SettingsPatch = {
   mode: null,
   toolbarPosition: null,
   launchAtStartup: null,
+  startMode: null,
+  theme: null,
+  includeCursor: null,
+  nameTemplate: null,
+  retention: null,
+  recentColors: null,
+  confirmClose: null,
 };

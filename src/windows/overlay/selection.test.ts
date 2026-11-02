@@ -3,6 +3,7 @@ import type { Handle } from '@/lib/geometry';
 import type { Rect, WindowInfo } from '@/lib/ipc';
 import {
   cursorFor,
+  initialMode,
   initialState,
   sheetKey,
   sheetPointer,
@@ -246,5 +247,13 @@ describe('sheetPointer', () => {
   it('with the sheet closed, the pointer goes to the selection', () => {
     expect(sheetPointer('down', false, false)).toBeNull();
     expect(sheetPointer('up', false, false)).toBeNull();
+  });
+});
+
+describe('initialMode', () => {
+  it('starts in the configured mode, or the last one with « last »', () => {
+    expect(initialMode('region', 'window')).toBe('region');
+    expect(initialMode('window', 'region')).toBe('window');
+    expect(initialMode('last', 'window')).toBe('window');
   });
 });

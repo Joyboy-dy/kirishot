@@ -11,7 +11,7 @@ import {
   type Point,
   type Size,
 } from '@/lib/geometry';
-import type { CommitTarget, Rect, WindowInfo } from '@/lib/ipc';
+import type { CommitTarget, Rect, StartModeSetting, WindowInfo } from '@/lib/ipc';
 
 export type Mode = 'region' | 'window';
 
@@ -79,6 +79,11 @@ function dragRect(anchor: Point, at: Point, square: boolean, fromCentre: boolean
     width: 2 * r.width,
     height: 2 * r.height,
   };
+}
+
+/** The mode a capture starts in: the configured one, or the last one chosen (spec J3 § 2.3). */
+export function initialMode(start: StartModeSetting, last: Mode): Mode {
+  return start === 'last' ? last : start;
 }
 
 /** What a key does to the shortcut sheet: `?` opens or closes it, Échap only closes it. */

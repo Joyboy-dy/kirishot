@@ -114,7 +114,7 @@ export function Toolbar({
       <ToolButton label={t('overlay.help')} keys={['?']} iconOnly onClick={onHelp}>
         <CircleHelp size={16} strokeWidth={1.9} />
       </ToolButton>
-      <ToolButton label={t('overlay.cancel')} keys={['Échap']} onClick={onCancel}>
+      <ToolButton label={t('overlay.cancel')} keys={['Échap']} iconOnly onClick={onCancel}>
         <X size={16} strokeWidth={1.9} />
       </ToolButton>
     </div>

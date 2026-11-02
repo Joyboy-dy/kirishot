@@ -84,6 +84,8 @@ export type CaptureSettings = {
 	/**  The selection mode the next capture starts in (the last one chosen). */
 	mode: CaptureMode,
 	toolbarPosition: ToolbarPosition,
+	/**  The mode a capture starts in (spec J3 § 2.3). */
+	startMode: StartModeSetting,
 };
 
 /**  What the selection overlay asks Rust to capture. */
@@ -95,6 +97,13 @@ export type EditorSession = {
 	width: number,
 	height: number,
 	title: string,
+};
+
+export type EditorSettings = {
+	/**  The last custom colours, newest first, `#RRGGBB`, 8 at most. */
+	recentColors: string[],
+	/**  Ask before closing a capture with unsaved changes (spec J3 § 3.5). */
+	confirmClose: boolean,
 };
 
 /**  Stable error codes shared with the front end, which translates them. */
@@ -165,6 +174,7 @@ export type OverlaySession = {
 	/**  The mode the selection starts in. */
 	mode: CaptureMode,
 	toolbarPosition: ToolbarPosition,
+	startMode: StartModeSetting,
 };
 
 export type Point = {
@@ -178,6 +188,9 @@ export type Rect = {
 	width: number,
 	height: number,
 };
+
+/**  How long the history keeps captures; a patch cannot carry `null` to mean "forever". */
+export type Retention = { kind: "days"; value: number } | { kind: "forever" };
 
 export type SaveSettings = {
 	/**  `None` keeps the default folder (Pictures\Kirishot), resolved at each use. */
@@ -195,6 +208,7 @@ export type Settings = {
 	shortcuts: Shortcuts,
 	history: HistorySettings,
 	system: SystemSettings,
+	editor: EditorSettings,
 	onboardingDone: boolean,
 };
 
@@ -218,6 +232,13 @@ export type SettingsPatch = {
 	mode: CaptureMode | null,
 	toolbarPosition: ToolbarPosition | null,
 	launchAtStartup: boolean | null,
+	startMode: StartModeSetting | null,
+	theme: Theme | null,
+	includeCursor: boolean | null,
+	nameTemplate: string | null,
+	retention: Retention | null,
+	recentColors: string[] | null,
+	confirmClose: boolean | null,
 };
 
 /**  What the settings page displays: the settings plus the resolved destination folder. */
@@ -236,6 +257,10 @@ export type Shortcuts = {
 	repeatRegion: string | null,
 	openHistory: string | null,
 };
+
+export type StartModeSetting = "region" | "window" | 
+/**  The mode chosen last (`capture.mode`). */
+"last";
 
 export type SystemSettings = {
 	launchAtStartup: boolean,

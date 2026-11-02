@@ -181,6 +181,18 @@ pub fn validate(mut s: Settings) -> (Settings, Vec<String>) {
         );
         s.history.retention_days = defaults.history.retention_days;
     }
+    let valid_hex = |c: &String| {
+        c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|ch| ch.is_ascii_hexdigit())
+    };
+    if s.editor.recent_colors.len() > 8 || !s.editor.recent_colors.iter().all(valid_hex) {
+        reset(
+            "editor.recentColors",
+            format!("{:?}", s.editor.recent_colors),
+            &mut warnings,
+        );
+        s.editor.recent_colors.retain(valid_hex);
+        s.editor.recent_colors.truncate(8);
+    }
     if s.save.counter == 0 {
         reset("save.counter", "0".into(), &mut warnings);
         s.save.counter = 1;
@@ -207,7 +219,9 @@ pub fn validate(mut s: Settings) -> (Settings, Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::settings::model::{AutoAction, CaptureMode, ImageFormat, Settings, ToolbarPosition};
+    use crate::settings::model::{
+        AutoAction, CaptureMode, ImageFormat, Settings, StartModeSetting, ToolbarPosition,
+    };
     use serde_json::json;
 
     #[test]
@@ -306,6 +320,45 @@ mod tests {
 
         let (s, _) = repair(json!({"version": 1, "capture": {"mode": "zone"}}));
         assert_eq!(s.capture.mode, CaptureMode::Region);
+    }
+
+    #[test]
+    fn recent_colors_are_kept_valid() {
+        let mut s = Settings::default();
+        s.editor.recent_colors = (0..9)
+            .map(|i| format!("#00000{i}"))
+            .chain(["red".to_string()])
+            .collect();
+        s.editor.recent_colors.insert(0, "red".into());
+        let (s, w) = validate(s);
+        assert_eq!(s.editor.recent_colors.len(), 8);
+        assert!(
+            s.editor
+                .recent_colors
+                .iter()
+                .all(|c| c.starts_with('#') && c.len() == 7)
+        );
+        assert_eq!(s.editor.recent_colors[0], "#000000");
+        assert!(w.iter().any(|m| m.contains("editor.recentColors")));
+    }
+
+    #[test]
+    fn retention_accepts_7_30_90_or_null() {
+        for v in [None, Some(7), Some(30), Some(90)] {
+            let mut s = Settings::default();
+            s.history.retention_days = v;
+            assert_eq!(validate(s).0.history.retention_days, v);
+        }
+        let mut s = Settings::default();
+        s.history.retention_days = Some(45);
+        assert_eq!(validate(s).0.history.retention_days, Some(30));
+    }
+
+    #[test]
+    fn j3_fields_default_in_old_files() {
+        let (s, _) = repair(json!({"version": 1, "capture": {"mode": "window"}}));
+        assert_eq!(s.capture.start_mode, StartModeSetting::Region);
+        assert!(s.editor.confirm_close && s.editor.recent_colors.is_empty());
     }
 
     #[test]

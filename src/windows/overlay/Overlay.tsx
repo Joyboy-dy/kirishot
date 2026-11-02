@@ -20,6 +20,7 @@ import { Toolbar } from './Toolbar';
 import { useOverlaySession } from './useOverlaySession';
 import {
   cursorFor,
+  initialMode,
   initialState,
   sheetKey,
   sheetPointer,
@@ -81,7 +82,7 @@ export function Overlay() {
   const { session, frame } = useOverlaySession(canvasRef, {
     onSession: (s) => {
       setSelection(initialState);
-      setMode(s.mode);
+      setMode(initialMode(s.startMode, s.mode));
       showSheet(false);
       setMagnifier(s.magnifier);
       setActive(s.cursor !== null);
@@ -133,7 +134,9 @@ export function Overlay() {
   // The next capture starts in the mode chosen last (spec J2.1 § 2.1).
   const rememberMode = (next: Mode) => {
     setMode(next);
-    report(commands.settingsUpdate({ ...NO_CHANGE, mode: next }));
+    // Remembered only when the next capture should start in the last mode chosen.
+    if (sessionRef.current?.startMode === 'last')
+      report(commands.settingsUpdate({ ...NO_CHANGE, mode: next }));
   };
 
   const toggleMagnifier = (on: boolean) => {
