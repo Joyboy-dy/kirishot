@@ -59,3 +59,12 @@ describe('keys already handled', () => {
     ).toBeNull();
   });
 });
+
+describe('order shortcuts', () => {
+  const ctrl = (key: string) =>
+    keyAction({ key, ctrl: true, shift: false, alt: false, editingText: false });
+  it('Ctrl+] brings to front, Ctrl+[ sends to back', () => {
+    expect(ctrl(']')).toEqual({ type: 'front' });
+    expect(ctrl('[')).toEqual({ type: 'back' });
+  });
+});

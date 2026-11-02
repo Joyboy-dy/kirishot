@@ -309,7 +309,7 @@ export function ColorMenu(p: { value?: string; onChange(color: string): void }) 
 }
 
 /** The settings behind one « Style » button (spec J2.1 § 4.1, compact and narrow layouts). */
-export function StyleMenu(p: ControlsProps & { iconOnly?: boolean }) {
+export function StyleMenu(p: ControlsProps & { iconOnly?: boolean; extra?: ReactNode }) {
   return (
     <Menu
       label={t('editor.style')}
@@ -332,6 +332,14 @@ export function StyleMenu(p: ControlsProps & { iconOnly?: boolean }) {
         onSettled={p.onSettled}
         withoutColor={p.withoutColor}
       />
+      {p.extra && (
+        <div
+          className="flex w-full items-center gap-0.5 pt-1"
+          style={{ borderTop: '1px solid var(--k-border)' }}
+        >
+          {p.extra}
+        </div>
+      )}
     </Menu>
   );
 }

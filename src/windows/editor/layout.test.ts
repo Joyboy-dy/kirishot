@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toolbarLayout } from './layout';
+import { selectionActionsPlacement, toolbarLayout } from './layout';
 
 describe('toolbarLayout', () => {
   it('follows the spec breakpoints', () => {
@@ -20,5 +20,13 @@ describe('toolbarLayout with a measured overflow', () => {
 
   it('never goes full below 1 100 px', () => {
     expect(toolbarLayout(1050, 1000)).toBe('compact');
+  });
+});
+
+describe('selectionActionsPlacement', () => {
+  it('keeps the actions in the bar unless the bar is narrow', () => {
+    expect(selectionActionsPlacement('full')).toBe('bar');
+    expect(selectionActionsPlacement('compact')).toBe('bar');
+    expect(selectionActionsPlacement('narrow')).toBe('menu');
   });
 });

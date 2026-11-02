@@ -56,6 +56,8 @@ export const EDITOR_SHORTCUTS: ShortcutGroup[] = [
       { keys: ['Ctrl', 'D'], label: t('keys.editor.duplicate') },
       { keys: ['Ctrl', 'A'], label: t('keys.editor.selectAll') },
       { keys: ['Suppr'], label: t('editor.delete') },
+      { keys: ['Ctrl', ']'], label: t('editor.front') },
+      { keys: ['Ctrl', '['], label: t('editor.back') },
       { keys: ['←', '↑', '→', '↓'], label: t('keys.editor.nudge') },
       { keys: ['1', '2', '3', '4'], label: t('keys.editor.size') },
     ],

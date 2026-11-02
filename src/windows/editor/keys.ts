@@ -17,7 +17,9 @@ export type EditorAction =
         | 'saveAs'
         | 'copyAndClose'
         | 'delete'
-        | 'escape';
+        | 'escape'
+        | 'front'
+        | 'back';
     };
 
 type KeyInput = {
@@ -49,6 +51,8 @@ export function keyAction(e: KeyInput): EditorAction | null {
     if (key === 'c') return { type: 'copy' };
     if (key === 's') return { type: e.shift ? 'saveAs' : 'save' };
     if (key === 'Enter') return { type: 'copyAndClose' };
+    if (key === ']') return { type: 'front' };
+    if (key === '[') return { type: 'back' };
     return null;
   }
   if (e.alt) return null;

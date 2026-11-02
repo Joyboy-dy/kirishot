@@ -22,7 +22,6 @@ import { commands } from '@/lib/ipc';
 import { t } from '@/i18n';
 import { Canvas, type CanvasPointer } from './Canvas';
 import { useAutosave } from './autosave';
-import { ContextBubble } from './ContextBubble';
 import { exportImage, type ExportIntent } from './export';
 import { buttonView, closeAfterCopy, FEEDBACK, messageVisible, type ButtonState } from './feedback';
 import { keyAction, type EditorAction } from './keys';
@@ -79,7 +78,7 @@ function cropBox(a: Point, b: Point): Rect {
 /** The annotation editor (spec J2 § 4). */
 export function Editor() {
   const loaded = useEditorSession();
-  // The stage as state: the bubble and the transformer read its nodes while rendering.
+  // The stage as state: the transformer reads its nodes while rendering.
   const [stage, setStage] = useState<Konva.Stage | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
@@ -289,6 +288,12 @@ export function Editor() {
         if (cropDraft) return changeTool('select');
         if (selected.length > 0) return setSelected([]);
         return void commands.editorClose();
+      case 'front':
+        if (selected.length === 0) return;
+        return record(selected.reduce((d, id) => reorder(d, id, 'front'), doc));
+      case 'back':
+        if (selected.length === 0) return;
+        return record([...selected].reverse().reduce((d, id) => reorder(d, id, 'back'), doc));
       case 'save':
         // Nothing changed since the last save: no second identical file (spec J3 § 3.2).
         if (currentSave === 'clean') return;
@@ -436,20 +441,6 @@ export function Editor() {
   };
 
   const selectedAnnotations = doc ? doc.annotations.filter((a) => selected.includes(a.id)) : [];
-  // The bubble sits under the selection, in the canvas area's CSS pixels.
-  let bubbleSel: Rect | null = null;
-  if (tool === 'select' && selectedAnnotations.length > 0 && stage) {
-    const rects = selected
-      .map((id) => stage?.findOne(`#${id}`)?.getClientRect())
-      .filter((r): r is NonNullable<typeof r> => Boolean(r));
-    if (rects.length > 0) {
-      const left = Math.min(...rects.map((r) => r.x));
-      const top = Math.min(...rects.map((r) => r.y));
-      const right = Math.max(...rects.map((r) => r.x + r.width));
-      const bottom = Math.max(...rects.map((r) => r.y + r.height));
-      bubbleSel = { x: left, y: top, width: right - left, height: bottom - top };
-    }
-  }
   // What the controls show: the first selected annotation's settings, or the drawing style.
   const shownStyle: StylePatch =
     tool === 'select' && selectedAnnotations[0] && doc
@@ -483,7 +474,20 @@ export function Editor() {
         onUndo={() => setHistory((h) => h && undo(h))}
         onRedo={() => setHistory((h) => h && redo(h))}
         onCopy={() => runExport('copy')}
-        onSave={() => runExport('save')}
+        onSave={() => act({ type: 'save' })}
+        saveState={currentSave}
+        onSaveVersion={() => runExport('saveVersion')}
+        onSaveAs={() => runExport('saveAs')}
+        selectionActions={
+          selected.length > 0
+            ? {
+                onFront: () => act({ type: 'front' }),
+                onBack: () => act({ type: 'back' }),
+                onDuplicate: () => act({ type: 'duplicate' }),
+                onDelete: () => act({ type: 'delete' }),
+              }
+            : null
+        }
         onCopyAndClose={() => runExport('copyAndClose')}
       />
       <div
@@ -570,21 +574,6 @@ export function Editor() {
         )}
         {editing && (
           <TextEditor a={editing} view={view} onDone={(text) => finishText(editing, text)} />
-        )}
-        {bubbleSel && (
-          <ContextBubble
-            selected={selectedAnnotations}
-            sel={bubbleSel}
-            area={box}
-            value={shownStyle}
-            onStyle={changeStyle}
-            onStyleSettled={settleStyle}
-            onFront={() => doc && record(selected.reduce((d, id) => reorder(d, id, 'front'), doc))}
-            onBack={() =>
-              doc && record([...selected].reverse().reduce((d, id) => reorder(d, id, 'back'), doc))
-            }
-            onDelete={() => act({ type: 'delete' })}
-          />
         )}
       </div>
       <StatusBar

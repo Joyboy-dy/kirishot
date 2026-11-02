@@ -1,8 +1,23 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, ClipboardCheck, Copy, Download, LoaderCircle, Redo2, Undo2 } from 'lucide-react';
+import {
+  ArrowDownToLine,
+  ArrowUpToLine,
+  Check,
+  ChevronDown,
+  ClipboardCheck,
+  Copy,
+  CopyPlus,
+  Download,
+  LoaderCircle,
+  Redo2,
+  Trash2,
+  Undo2,
+} from 'lucide-react';
+import { Popover } from 'radix-ui';
 import { Tip } from '@/components/ui/Tip';
 import { t } from '@/i18n';
-import { toolbarLayout } from './layout';
+import { selectionActionsPlacement, toolbarLayout } from './layout';
+import type { SaveState } from './save';
 import { ColorMenu, StyleControls, StyleMenu } from './StylePopover';
 import { TOOLS, type ToolId } from './tools/catalog';
 import type { Option, StylePatch } from './tools/options';
@@ -24,7 +39,20 @@ type Props = {
   onRedo(): void;
   onCopy(): void;
   onSave(): void;
+  /** `clean`: nothing to save, the button is off (spec J3 § 3.2). */
+  saveState: SaveState;
+  onSaveVersion(): void;
+  onSaveAs(): void;
   onCopyAndClose(): void;
+  /** The selection's actions; `null` without a selection (spec J3 § 3.1). */
+  selectionActions: SelectionActions | null;
+};
+
+type SelectionActions = {
+  onFront(): void;
+  onBack(): void;
+  onDuplicate(): void;
+  onDelete(): void;
 };
 
 function BarButton(props: {
@@ -54,6 +82,110 @@ function BarButton(props: {
         {props.children}
       </button>
     </Tip>
+  );
+}
+
+function SelectionButtons({ a, dense }: { a: SelectionActions; dense: boolean }) {
+  return (
+    <>
+      <BarButton label={t('editor.front')} keys={['Ctrl', ']']} dense={dense} onClick={a.onFront}>
+        <ArrowUpToLine size={17} strokeWidth={1.9} />
+      </BarButton>
+      <BarButton label={t('editor.back')} keys={['Ctrl', '[']} dense={dense} onClick={a.onBack}>
+        <ArrowDownToLine size={17} strokeWidth={1.9} />
+      </BarButton>
+      <BarButton
+        label={t('editor.duplicate')}
+        keys={['Ctrl', 'D']}
+        dense={dense}
+        onClick={a.onDuplicate}
+      >
+        <CopyPlus size={17} strokeWidth={1.9} />
+      </BarButton>
+      <BarButton label={t('editor.delete')} keys={['Suppr']} dense={dense} onClick={a.onDelete}>
+        <Trash2 size={17} strokeWidth={1.9} />
+      </BarButton>
+    </>
+  );
+}
+
+/** « Enregistrer » and its menu: new version, save as (spec J3 § 3.2). */
+function SaveButton(p: {
+  state: SaveState;
+  busy: boolean;
+  view: 'icon' | 'spinner' | 'check';
+  withLabel: boolean;
+  dense: boolean;
+  onSave(): void;
+  onSaveVersion(): void;
+  onSaveAs(): void;
+}) {
+  const clean = p.state === 'clean';
+  const item =
+    'k-press flex h-8 w-full items-center whitespace-nowrap rounded-md border-0 bg-transparent px-2.5 text-left text-[13px] hover:bg-white/10 disabled:opacity-40';
+  return (
+    <span className="flex shrink-0 items-center">
+      <Tip label={clean ? t('editor.saveClean') : t('editor.save')} keys={['Ctrl', 'S']}>
+        <button
+          type="button"
+          aria-label={t('editor.save')}
+          disabled={p.busy || clean}
+          onClick={p.onSave}
+          className={`k-press flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-l-lg border-0 bg-transparent text-[13px] hover:bg-white/10 disabled:opacity-40 ${p.dense ? 'px-1' : 'px-2'}`}
+          style={{ color: 'var(--k-text)' }}
+        >
+          <Result view={p.view}>
+            <Download size={17} strokeWidth={1.9} />
+          </Result>
+          {p.withLabel && t('editor.save')}
+        </button>
+      </Tip>
+      <Popover.Root>
+        <Tip label={t('editor.saveMenu')}>
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              aria-label={t('editor.saveMenu')}
+              disabled={p.busy}
+              className="k-press flex h-8 w-5 shrink-0 items-center justify-center rounded-r-lg border-0 bg-transparent hover:bg-white/10 disabled:opacity-40"
+              style={{ color: 'var(--k-text-2)' }}
+            >
+              <ChevronDown size={14} strokeWidth={2} />
+            </button>
+          </Popover.Trigger>
+        </Tip>
+        <Popover.Portal>
+          <Popover.Content
+            side="bottom"
+            align="end"
+            sideOffset={6}
+            collisionPadding={8}
+            className="z-50 flex min-w-56 flex-col gap-0.5 rounded-xl p-1"
+            style={{
+              background: 'var(--k-glass)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid var(--k-border)',
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
+              color: 'var(--k-text)',
+            }}
+          >
+            <Popover.Close asChild>
+              <button type="button" className={item} onClick={p.onSaveVersion}>
+                {t('editor.saveVersion')}
+              </button>
+            </Popover.Close>
+            <Popover.Close asChild>
+              <button type="button" className={item} onClick={p.onSaveAs}>
+                <span className="flex-1">{t('editor.saveAs')}</span>
+                <span className="text-[11.5px]" style={{ color: 'var(--k-text-3)' }}>
+                  Ctrl+Maj+S
+                </span>
+              </button>
+            </Popover.Close>
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
+    </span>
   );
 }
 
@@ -100,6 +232,7 @@ export function TopBar(p: Props) {
   const dense = layout === 'narrow';
   const hasColor = p.options.includes('color');
   const menuOptions = layout === 'compact' ? p.options.filter((o) => o !== 'color') : p.options;
+  const actionsInMenu = p.selectionActions !== null && selectionActionsPlacement(layout) === 'menu';
   return (
     <header
       role="toolbar"
@@ -133,14 +266,29 @@ export function TopBar(p: Props) {
         {layout === 'compact' && hasColor && (
           <ColorMenu value={p.value.color} onChange={(color) => p.onStyle({ color })} />
         )}
-        {layout !== 'full' && menuOptions.length > 0 && (
+        {layout !== 'full' && (menuOptions.length > 0 || actionsInMenu) && (
           <StyleMenu
             options={menuOptions}
             value={p.value}
             onChange={p.onStyle}
             onSettled={p.onStyleSettled}
             iconOnly={dense}
+            extra={
+              actionsInMenu && p.selectionActions ? (
+                <SelectionButtons a={p.selectionActions} dense />
+              ) : undefined
+            }
           />
+        )}
+        {p.selectionActions && !actionsInMenu && (
+          <span
+            role="group"
+            aria-label={t('editor.actions')}
+            className="flex shrink-0 items-center"
+          >
+            <Divider />
+            <SelectionButtons a={p.selectionActions} dense={dense} />
+          </span>
         )}
       </div>
       <Divider />
@@ -174,17 +322,16 @@ export function TopBar(p: Props) {
           <Copy size={17} strokeWidth={1.9} />
         </Result>
       </BarButton>
-      <BarButton
-        label={t('editor.save')}
-        keys={['Ctrl', 'S']}
+      <SaveButton
+        state={p.saveState}
+        busy={p.busy}
+        view={p.views.save}
+        withLabel={layout === 'full'}
         dense={dense}
-        disabled={p.busy}
-        onClick={p.onSave}
-      >
-        <Result view={p.views.save}>
-          <Download size={17} strokeWidth={1.9} />
-        </Result>
-      </BarButton>
+        onSave={p.onSave}
+        onSaveVersion={p.onSaveVersion}
+        onSaveAs={p.onSaveAs}
+      />
       <Tip label={t('editor.copyAndClose')} keys={['Ctrl', 'Entrée']}>
         <button
           type="button"
