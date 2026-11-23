@@ -154,7 +154,7 @@ pub fn push(
         }
     };
     *app.state::<ThumbState>().area.lock().unwrap() =
-        Some((window::work_area(monitor), monitor.scale));
+        Some((window::work_area(app, monitor), monitor.scale));
     let card = ThumbnailPushed {
         id,
         src,

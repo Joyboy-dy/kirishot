@@ -6,7 +6,7 @@ export function resolveTheme(setting: Theme, systemDark: boolean): 'dark' | 'lig
   return setting;
 }
 
-/** Applies the theme setting to this window now and whenever it or Windows' theme changes. */
+/** Applies the theme setting to this window now and whenever it or the system theme changes. */
 export function followTheme(): void {
   const media = window.matchMedia('(prefers-color-scheme: dark)');
   let setting: Theme = 'system';

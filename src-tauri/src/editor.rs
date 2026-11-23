@@ -221,7 +221,7 @@ fn open_now(app: &tauri::AppHandle, id: &str) -> KResult<()> {
         release(app, &previous);
     }
     if let Some((pixels, json)) = post_now {
-        frame::post_frame(&window, pixels, json)?;
+        frame::post_frame("editor-frame", &window, pixels, json)?;
     }
     window.set_title(&title).map_err(window_error)?;
     let _ = window.unminimize();
@@ -239,7 +239,7 @@ pub fn mark_loaded(window: &WebviewWindow) -> KResult<()> {
         inner.pending.take()
     };
     match pending {
-        Some((pixels, json)) => frame::post_frame(window, pixels, json),
+        Some((pixels, json)) => frame::post_frame("editor-frame", window, pixels, json),
         None => Ok(()),
     }
 }

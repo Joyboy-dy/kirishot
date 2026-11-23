@@ -28,10 +28,18 @@ pub fn blend_cursor(img: &mut RgbaImage, cursor: &CursorImage, origin: (i32, i32
 }
 
 /// The pointer as Windows shows it now, or `None` when it is hidden.
+#[cfg(windows)]
 pub fn read_cursor() -> Option<CursorImage> {
     win::read()
 }
 
+/// Reading the pointer under X11 or Wayland is not implemented yet: the setting is ignored.
+#[cfg(not(windows))]
+pub fn read_cursor() -> Option<CursorImage> {
+    None
+}
+
+#[cfg(windows)]
 mod win {
     use std::ffi::c_void;
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeFrame, pixelHex } from './frame';
+import { decodeBase64Frame, decodeFrame, pixelHex } from './frame';
 
 describe('decodeFrame', () => {
   it('reads the size header', () => {
@@ -10,6 +10,14 @@ describe('decodeFrame', () => {
 
   it('rejects a truncated buffer', () =>
     expect(() => decodeFrame(new Uint8Array([2, 0, 0, 0, 1, 0, 0, 0, 1]).buffer)).toThrow());
+});
+
+describe('decodeBase64Frame', () => {
+  it('decodes the bytes Rust sends on Linux', () => {
+    const bytes = new Uint8Array([2, 0, 0, 0, 1, 0, 0, 0, 1, 2, 3, 255, 4, 5, 6, 255]);
+    const encoded = btoa(String.fromCharCode(...bytes));
+    expect(Array.from(new Uint8Array(decodeBase64Frame(encoded)))).toEqual(Array.from(bytes));
+  });
 });
 
 describe('pixelHex', () => {

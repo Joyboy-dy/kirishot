@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Kbd } from '@/components/ui/Kbd';
 import { commands, events, type BindingSlot } from '@/lib/ipc';
+import { isLinux } from '@/lib/platform';
 import { EDITOR_SHORTCUTS, SELECTION_SHORTCUTS, type ShortcutGroup } from '@/lib/shortcuts';
 import { t, type MessageKey } from '@/i18n';
 import { Page } from '../Page';
 import { Row, Section } from '../settings/Layout';
 import { useSettings } from '../useSettings';
-import { displayAccel } from './recorder';
+import { accelFromKey, displayAccel } from './recorder';
 
 const SLOTS: { slot: BindingSlot; label: MessageKey; hint: MessageKey }[] = [
   { slot: 'region', label: 'keys.global.region', hint: 'keys.global.region.hint' },
@@ -43,10 +44,29 @@ export function ShortcutsPage() {
     setErrors((e) => ({ ...e, [slot]: r.status === 'error' ? r.error.message : undefined }));
   };
 
-  // The keyboard hook records the next combination and sends it here.
+  // Windows: the keyboard hook records the next combination and sends it here. Linux: the page
+  // records it itself, since the global-shortcut plugin has no recording mode.
   useEffect(() => {
     if (!recording) return;
     const slot = recording;
+    if (isLinux) {
+      const onKey = (e: KeyboardEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.repeat) return;
+        const accel = accelFromKey(e);
+        if (accel === undefined) return;
+        setRecording(null);
+        if (accel) void set(slot, accel);
+      };
+      const leave = () => setRecording(null);
+      window.addEventListener('keydown', onKey, true);
+      window.addEventListener('blur', leave);
+      return () => {
+        window.removeEventListener('keydown', onKey, true);
+        window.removeEventListener('blur', leave);
+      };
+    }
     const unlisten = events.shortcutRecorded.listen((e) => {
       setRecording(null);
       if (e.payload.accel) void set(slot, e.payload.accel);

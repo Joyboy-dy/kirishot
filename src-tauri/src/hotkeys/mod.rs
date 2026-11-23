@@ -1,14 +1,21 @@
 //! Global shortcuts from the settings.
+#[cfg(windows)]
 mod ll_hook;
+#[cfg(windows)]
 mod raw_keys;
+#[cfg(windows)]
 mod record;
 
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
+
+#[cfg(windows)]
+use std::sync::Mutex;
+#[cfg(windows)]
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+#[cfg(windows)]
 use tauri_specta::Event;
 
 use crate::error::{ErrorCode, KResult, KirishotError};
@@ -69,7 +76,7 @@ pub fn validate_binding(
     let Some(accel) = accel else {
         return Ok(());
     };
-    let parsed = ll_hook::parse_hook_accel(accel).is_some()
+    let parsed = hook_supports(accel)
         || accel
             .parse::<tauri_plugin_global_shortcut::Shortcut>()
             .is_ok();
@@ -108,13 +115,28 @@ fn slot_value_mut(s: &mut Shortcuts, slot: BindingSlot) -> &mut Option<String> {
     }
 }
 
+/// Windows answers PrintScreen and Win combinations through its low-level hook; elsewhere the
+/// global-shortcut plugin handles every binding.
+#[cfg(windows)]
+fn hook_supports(accel: &str) -> bool {
+    ll_hook::parse_hook_accel(accel).is_some()
+}
+
+#[cfg(not(windows))]
+fn hook_supports(_accel: &str) -> bool {
+    false
+}
+
 /// Keeps the keyboard hook installed for the life of the app.
+#[cfg(windows)]
 struct HookState(#[allow(dead_code)] ll_hook::HookGuard);
 
 /// The combinations the low-level hook answers to; changed by the Raccourcis page.
+#[cfg(windows)]
 static HOOKED: Mutex<Vec<(ll_hook::HookKey, HotkeyAction)>> = Mutex::new(Vec::new());
 
 /// The Raccourcis page waits for a new combination: the next one goes to it, not to a capture.
+#[cfg(windows)]
 static RECORDING: AtomicBool = AtomicBool::new(false);
 
 /// The combination recorded for the Raccourcis page; `None` when cancelled with Échap.
@@ -124,12 +146,17 @@ pub struct ShortcutRecorded {
 }
 
 /// Starts or stops waiting for a combination (spec J3 § 4.3).
+#[cfg(windows)]
 pub fn record(app: &tauri::AppHandle, on: bool) {
     if on {
         ensure_hook(app);
     }
     RECORDING.store(on, Ordering::SeqCst);
 }
+
+/// The page records the combination itself on Linux: there is no keyboard hook to install.
+#[cfg(not(windows))]
+pub fn record(_app: &tauri::AppHandle, _on: bool) {}
 
 /// Registers every binding: PrintScreen and Windows-key combinations through the low-level
 /// hook, the others through the global-shortcut plugin. A shortcut taken by another
@@ -149,31 +176,34 @@ fn apply(app: &tauri::AppHandle, s: &Shortcuts) -> Vec<String> {
     if let Err(e) = app.global_shortcut().unregister_all() {
         log::warn!("cannot unregister the shortcuts: {e}");
     }
+    #[cfg(windows)]
     let mut hooked = Vec::new();
     let mut refused = Vec::new();
     for (action, accel) in bindings(s) {
-        match ll_hook::parse_hook_accel(&accel) {
-            Some(key) => {
-                log::debug!("{accel}: low-level hook");
-                hooked.push((key, action));
-            }
-            None => {
-                if let Err(e) = register_with_plugin(app, action, &accel) {
-                    log::warn!("cannot register {accel}: {e}");
-                    refused.push(accel);
-                }
-            }
+        #[cfg(windows)]
+        if let Some(key) = ll_hook::parse_hook_accel(&accel) {
+            log::debug!("{accel}: low-level hook");
+            hooked.push((key, action));
+            continue;
+        }
+        if let Err(e) = register_with_plugin(app, action, &accel) {
+            log::warn!("cannot register {accel}: {e}");
+            refused.push(accel);
         }
     }
-    let needs_hook = !hooked.is_empty();
-    *HOOKED.lock().unwrap() = hooked;
-    if needs_hook {
-        ensure_hook(app);
+    #[cfg(windows)]
+    {
+        let needs_hook = !hooked.is_empty();
+        *HOOKED.lock().unwrap() = hooked;
+        if needs_hook {
+            ensure_hook(app);
+        }
     }
     refused
 }
 
 /// Installs the hook once; it reads `HOOKED` at each key, so later changes need no reinstall.
+#[cfg(windows)]
 fn ensure_hook(app: &tauri::AppHandle) {
     if app.try_state::<HookState>().is_some() {
         return;

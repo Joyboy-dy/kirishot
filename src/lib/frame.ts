@@ -13,6 +13,14 @@ export function decodeFrame(buf: ArrayBuffer): Frame {
   return { width, height, pixels: new Uint8ClampedArray(buf, 8, size) };
 }
 
+/** Decodes the base64 frame Rust sends on platforms without WebView2 shared buffers. */
+export function decodeBase64Frame(encoded: string): ArrayBuffer {
+  const binary = atob(encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
 /** The colour of a pixel as `RRGGBB`, read from the CPU copy; outside points are clamped. */
 export function pixelHex(frame: Frame, at: { x: number; y: number }): string {
   const x = Math.min(Math.max(Math.round(at.x), 0), frame.width - 1);

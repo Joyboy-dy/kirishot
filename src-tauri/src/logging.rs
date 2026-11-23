@@ -2,7 +2,8 @@ use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 
 use crate::paths;
 
-/// Log files in `%APPDATA%\Kirishot\logs`: at most 5 files of 2 MB each.
+/// Log files in `%APPDATA%\Kirishot\logs` (`$XDG_DATA_HOME/kirishot/logs` on Linux): at most 5
+/// files of 2 MB each.
 pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
     let mut builder = tauri_plugin_log::Builder::new()
         .clear_targets()

@@ -4,7 +4,9 @@ use std::time::Instant;
 use tauri::Manager;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
+#[cfg(windows)]
 use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
+#[cfg(windows)]
 use windows::core::w;
 
 use crate::error::{ErrorCode, KResult, KirishotError};
@@ -27,6 +29,7 @@ pub fn tray_variant(system_uses_light_theme: Option<u32>) -> TrayVariant {
     }
 }
 
+#[cfg(windows)]
 fn system_uses_light_theme() -> Option<u32> {
     let mut value = 0u32;
     let mut size = std::mem::size_of::<u32>() as u32;
@@ -42,6 +45,13 @@ fn system_uses_light_theme() -> Option<u32> {
         )
     };
     status.is_ok().then_some(value)
+}
+
+/// The desktop environment does not expose a taskbar theme: keep the white mark, which reads
+/// on the dark panels most Linux desktops use.
+#[cfg(not(windows))]
+fn system_uses_light_theme() -> Option<u32> {
+    None
 }
 
 /// Keeps the icon alive for the life of the app.
