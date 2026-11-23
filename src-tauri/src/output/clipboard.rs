@@ -1,10 +1,10 @@
-//! Copying an image as both `PNG` (browsers, Discord) and `CF_DIBV5` (Word, Paint, older apps).
-use std::time::Duration;
-
+//! Copying an image to the clipboard: Windows gets both `PNG` (browsers, Discord) and
+//! `CF_DIBV5` (Word, Paint, older apps); Linux gets `image/png` through arboard.
 use image::RgbaImage;
 
 use crate::error::{ErrorCode, KResult, KirishotError};
 
+#[cfg(windows)]
 const CF_DIBV5: u32 = 17;
 const BI_BITFIELDS: u32 = 3;
 const LCS_SRGB: u32 = 0x7352_4742;
@@ -43,7 +43,10 @@ pub fn dibv5_from_rgba(img: &RgbaImage) -> Vec<u8> {
 
 /// Replaces the clipboard content with both formats. Opening is retried 3 times, 50 ms apart,
 /// when another application holds the clipboard.
-pub fn write_image(owner: Option<isize>, png: &[u8], dib: &[u8]) -> KResult<()> {
+#[cfg(windows)]
+pub fn write_image(owner: Option<isize>, img: &RgbaImage, png: &[u8]) -> KResult<()> {
+    use std::time::Duration;
+
     let owner = owner.map_or(std::ptr::null_mut(), |h| h as clipboard_win::types::HWND);
     let mut retries = 3;
     let _clipboard = loop {
@@ -68,17 +71,59 @@ pub fn write_image(owner: Option<isize>, png: &[u8], dib: &[u8]) -> KResult<()> 
             format!("Impossible de copier l'image : {e}"),
         )
     };
+    let dib = dibv5_from_rgba(img);
     clipboard_win::raw::empty().map_err(|e| fail(&e))?;
-    clipboard_win::raw::set_without_clear(CF_DIBV5, dib).map_err(|e| fail(&e))?;
+    clipboard_win::raw::set_without_clear(CF_DIBV5, &dib).map_err(|e| fail(&e))?;
     let png_format =
         clipboard_win::raw::register_format("PNG").ok_or_else(|| fail(&"format PNG"))?;
     clipboard_win::raw::set_without_clear(png_format.get(), png).map_err(|e| fail(&e))?;
     Ok(())
 }
 
+/// Replaces the clipboard content with the image as `image/png`.
+#[cfg(not(windows))]
+pub fn write_image(_owner: Option<isize>, img: &RgbaImage, _png: &[u8]) -> KResult<()> {
+    let mut clipboard = arboard::Clipboard::new().map_err(|e| {
+        KirishotError::new(
+            ErrorCode::Clipboard,
+            format!("Presse-papiers indisponible : {e}"),
+        )
+    })?;
+    clipboard
+        .set_image(arboard::ImageData {
+            width: img.width() as usize,
+            height: img.height() as usize,
+            bytes: std::borrow::Cow::Borrowed(img.as_raw()),
+        })
+        .map_err(|e| {
+            KirishotError::new(
+                ErrorCode::Clipboard,
+                format!("Impossible de copier l'image : {e}"),
+            )
+        })
+}
+
 /// Replaces the clipboard content with text, such as a colour `#CFD4DC`.
+#[cfg(windows)]
 pub fn write_text(text: &str) -> KResult<()> {
     clipboard_win::set_clipboard_string(text).map_err(|e| {
+        KirishotError::new(
+            ErrorCode::Clipboard,
+            format!("Impossible de copier le texte : {e}"),
+        )
+    })
+}
+
+/// Replaces the clipboard content with text, such as a colour `#CFD4DC`.
+#[cfg(not(windows))]
+pub fn write_text(text: &str) -> KResult<()> {
+    let mut clipboard = arboard::Clipboard::new().map_err(|e| {
+        KirishotError::new(
+            ErrorCode::Clipboard,
+            format!("Presse-papiers indisponible : {e}"),
+        )
+    })?;
+    clipboard.set_text(text.to_string()).map_err(|e| {
         KirishotError::new(
             ErrorCode::Clipboard,
             format!("Impossible de copier le texte : {e}"),
@@ -114,6 +159,7 @@ mod tests {
         assert_eq!(&d[124 + 8..124 + 12], &[0, 0, 255, 255]);
     }
 
+    #[cfg(windows)]
     #[test]
     fn write_text_round_trips() {
         write_text("#CFD4DC").unwrap();

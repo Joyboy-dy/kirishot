@@ -154,13 +154,20 @@ fn save_capture(
 }
 
 fn copy_capture(app: &tauri::AppHandle, img: &RgbaImage, png: &mut Option<Vec<u8>>) -> KResult<()> {
-    // Owning the clipboard with a Kirishot window is what SetClipboardData documents.
-    let owner = app
-        .webview_windows()
+    clipboard::write_image(clipboard_owner(app), img, png_bytes(img, png)?)
+}
+
+/// Owning the clipboard with a Kirishot window is what SetClipboardData documents.
+#[cfg(windows)]
+fn clipboard_owner(app: &tauri::AppHandle) -> Option<isize> {
+    app.webview_windows()
         .into_iter()
         .find(|(label, _)| label.starts_with(crate::windowing::OVERLAY_PREFIX))
         .and_then(|(_, w)| w.hwnd().ok())
-        .map(|hwnd| hwnd.0 as isize);
-    let dib = clipboard::dibv5_from_rgba(img);
-    clipboard::write_image(owner, png_bytes(img, png)?, &dib)
+        .map(|hwnd| hwnd.0 as isize)
+}
+
+#[cfg(not(windows))]
+fn clipboard_owner(_app: &tauri::AppHandle) -> Option<isize> {
+    None
 }

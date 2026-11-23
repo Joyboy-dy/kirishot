@@ -139,9 +139,16 @@ fn create_overlay(
 
 /// Position first, then size: moving onto a monitor with another scale resizes the window.
 fn place(window: &WebviewWindow, m: &MonitorInfo) -> KResult<()> {
+    #[cfg(windows)]
     window
         .set_position(PhysicalPosition::new(m.x, m.y))
         .map_err(window_error)?;
+    // Wayland compositors decide where a window goes: the overlay still covers its monitor when
+    // the session runs on X11 or through XWayland.
+    #[cfg(not(windows))]
+    if let Err(e) = window.set_position(PhysicalPosition::new(m.x, m.y)) {
+        log::warn!("cannot position an overlay: {e}");
+    }
     window
         .set_size(PhysicalSize::new(m.width, m.height))
         .map_err(window_error)
@@ -162,7 +169,7 @@ pub fn post_to_overlay(
         .ok_or_else(|| KirishotError::new(ErrorCode::Window, "Fenêtre de sélection introuvable"))?;
     if overlays.loaded.contains(&label) {
         drop(overlays);
-        frame::post_frame(&window, frame, session_json)
+        frame::post_frame("overlay-frame", &window, frame, session_json)
     } else {
         overlays.pending.insert(label, (frame, session_json));
         Ok(())
@@ -179,8 +186,21 @@ pub fn mark_loaded(window: &WebviewWindow) -> KResult<()> {
         overlays.pending.remove(&label)
     };
     match pending {
-        Some((frame, json)) => frame::post_frame(window, frame, json),
+        Some((frame, json)) => frame::post_frame("overlay-frame", window, frame, json),
         None => Ok(()),
+    }
+}
+
+/// Wayland compositors may refuse focus requests, which must not fail the capture.
+fn focus_window(window: &WebviewWindow) -> KResult<()> {
+    #[cfg(windows)]
+    return window.set_focus().map_err(window_error);
+    #[cfg(not(windows))]
+    {
+        if let Err(e) = window.set_focus() {
+            log::warn!("cannot focus {}: {e}", window.label());
+        }
+        Ok(())
     }
 }
 
@@ -188,7 +208,7 @@ pub fn reveal(window: &WebviewWindow, m: &MonitorInfo, focus: bool) -> KResult<(
     place(window, m)?;
     window.show().map_err(window_error)?;
     if focus {
-        window.set_focus().map_err(window_error)?;
+        focus_window(window)?;
     }
     Ok(())
 }
@@ -198,7 +218,7 @@ pub fn open_main(app: &tauri::AppHandle) -> KResult<()> {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         window.show().map_err(window_error)?;
-        return window.set_focus().map_err(window_error);
+        return focus_window(&window);
     }
     WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
         .title("Kirishot")

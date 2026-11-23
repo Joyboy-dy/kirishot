@@ -5,6 +5,7 @@ const ARIA_NAMES: Record<string, string> = {
   Maj: 'Shift',
   Alt: 'Alt',
   Win: 'Meta',
+  Super: 'Meta',
   Échap: 'Escape',
   Entrée: 'Enter',
   Espace: 'Space',

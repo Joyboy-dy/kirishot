@@ -3,7 +3,9 @@ use std::f32::consts::PI;
 use std::sync::OnceLock;
 
 use tauri::Manager;
+#[cfg(windows)]
 use windows::Win32::Media::Audio::{PlaySoundW, SND_ASYNC, SND_MEMORY, SND_NODEFAULT};
+#[cfg(windows)]
 use windows::core::PCWSTR;
 
 use crate::settings::SettingsState;
@@ -20,6 +22,7 @@ pub fn play_shutter(app: &tauri::AppHandle) {
 }
 
 /// Plays the click regardless of the setting (preview in the settings page).
+#[cfg(windows)]
 pub fn play() {
     let wav = shutter_wav();
     // SND_ASYNC keeps reading the buffer after returning: it must live forever, and it does.
@@ -33,6 +36,41 @@ pub fn play() {
     if !played.as_bool() {
         log::warn!("cannot play the shutter sound");
     }
+}
+
+/// Plays the click with the first PulseAudio, PipeWire or ALSA player found. A failure is only
+/// logged: the sound is a nicety, not part of the capture.
+#[cfg(not(windows))]
+pub fn play() {
+    use std::process::{Command, Stdio};
+
+    let path = crate::paths::temp_dir().join("shutter.wav");
+    if let Some(dir) = path.parent()
+        && let Err(e) = std::fs::create_dir_all(dir)
+    {
+        log::warn!("cannot create {}: {e}", dir.display());
+        return;
+    }
+    if let Err(e) = std::fs::write(&path, shutter_wav()) {
+        log::warn!("cannot write the shutter sound: {e}");
+        return;
+    }
+    for player in ["paplay", "pw-play", "aplay"] {
+        match Command::new(player)
+            .arg(&path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            Ok(_) => return,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => {
+                log::warn!("cannot play the shutter sound with {player}: {e}");
+                return;
+            }
+        }
+    }
+    log::warn!("cannot play the shutter sound: install paplay, pw-play or aplay");
 }
 
 /// A 16-bit mono PCM WAV at 44.1 kHz.

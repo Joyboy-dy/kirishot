@@ -7,6 +7,7 @@ import { commands, events, type HistoryEntry } from '@/lib/ipc';
 import { t, type MessageKey } from '@/i18n';
 import { Page } from '../Page';
 import { useSettings } from '../useSettings';
+import { displayAccel } from '../shortcuts/recorder';
 import { HistoryCard } from './HistoryCard';
 import { FILTERS, filterEntries, formatBytes, groupByDay, type Filter } from './model';
 
@@ -70,13 +71,9 @@ export function HistoryPage() {
               style={{ color: 'var(--k-text-2)' }}
             >
               {t('history.emptyHint')}
-              {shortcut
-                .replace('Super', 'Win')
-                .replace('Shift', 'Maj')
-                .split('+')
-                .map((k) => (
-                  <Kbd key={k}>{k}</Kbd>
-                ))}
+              {displayAccel(shortcut).map((k) => (
+                <Kbd key={k}>{k}</Kbd>
+              ))}
             </p>
           )}
         </div>

@@ -1,5 +1,26 @@
 # Changelog
 
+## Non publié
+
+Port Linux (branche `version_linux`) :
+
+- Compilation sous Linux : dépendances Windows (`clipboard-win`, `webview2-com`, `windows`)
+  limitées à Windows, ajout de `arboard` pour le presse-papiers.
+- Capture d'écran, écran de sélection, éditeur, sauvegarde, historique et vignettes fonctionnels
+  sous X11 et Wayland (via `xcap` et le portail PipeWire).
+- Transfert de l'écran figé par un événement `overlay-frame` en base64, à la place du buffer
+  partagé WebView2.
+- Liste des fenêtres sous Linux via `xcap::Window::all()`.
+- Presse-papiers image (`image/png`) et texte via `arboard`.
+- Raccourcis globaux gérés par `tauri-plugin-global-shortcut`, enregistrement des combinaisons
+  depuis la page Raccourcis.
+- Son de l'obturateur via `paplay`, `pw-play` ou `aplay`.
+- Chemins de données XDG (`$XDG_DATA_HOME/kirishot`).
+- Configuration de paquet Linux (`deb`, `rpm`, `appimage`) et icône de zone de notification.
+- Libellés de l'interface neutralisés (système au lieu de Windows).
+- Limites connues : curseur non dessiné, liste des fenêtres vide sous Wayland pur, compositions
+  `Super` parfois réservées par le compositeur. Voir `docs/port-linux.md`.
+
 ## 0.1.0 (2026-11-02)
 
 First public release.

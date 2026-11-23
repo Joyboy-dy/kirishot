@@ -1,6 +1,6 @@
-//! How Kirishot was launched, and its registration to start with Windows (spec J3 § 2.1, § 2.2).
+//! How Kirishot was launched, and its registration to start at login (spec J3 § 2.1, § 2.2).
 
-/// The argument Windows passes when it starts Kirishot at logon.
+/// The argument the autostart entry passes when it starts Kirishot at login.
 pub const AUTOSTART_ARG: &str = "--autostart";
 
 /// `true` when the user launched Kirishot (installer, Start menu, double-click): the main window
@@ -9,7 +9,7 @@ pub fn launched_by_user(args: &[String]) -> bool {
     !args.iter().any(|a| a == AUTOSTART_ARG)
 }
 
-/// Registers or removes Kirishot from the programs Windows starts at logon.
+/// Registers or removes Kirishot from the programs started at login.
 pub fn apply_autostart(app: &tauri::AppHandle, on: bool) -> crate::error::KResult<()> {
     use tauri_plugin_autostart::ManagerExt;
     let manager = app.autolaunch();
